@@ -1,4 +1,4 @@
-import { ContactStatus, PhotoStatus, LeadPhase, PriorityLevel, VisitState, ProposalState, Lead } from '../types/crm';
+import { ContactStatus, PhotoStatus, LeadPhase, PriorityLevel, VisitState, ProposalState, Lead, AppUser, MarketDealRating } from '../types/crm';
 
 /**
  * Format numbers as Portuguese Euros (€)
@@ -31,6 +31,25 @@ export const formatDatePT = (dateStr: string | undefined): string => {
 };
 
 /**
+ * Format date strings into short readable time e.g. "Hoje às 14:30"
+ */
+export const formatDateTimePT = (dateStr: string | undefined): string => {
+  if (!dateStr) return '-';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return new Intl.DateTimeFormat('pt-PT', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(d);
+  } catch {
+    return dateStr;
+  }
+};
+
+/**
  * Calculate potential margin for lead: (Avaliação - Mínimo Absoluto)
  */
 export const calcLeadPotentialMargin = (avaliacao?: number, minAbsoluto?: number): number => {
@@ -43,6 +62,22 @@ export const calcLeadPotentialMargin = (avaliacao?: number, minAbsoluto?: number
  */
 export const calcProposalMargin = (revenda: number, proposta: number): number => {
   return (revenda || 0) - (proposta || 0);
+};
+
+/**
+ * Calculate default down payment (sinal) at 10%
+ */
+export const calcDefaultSinal = (valorProposta: number): number => {
+  if (!valorProposta || valorProposta <= 0) return 0;
+  return Math.round(valorProposta * 0.10);
+};
+
+/**
+ * Calculate multiple: Margem Prevista / Valor do Sinal (e.g. 30.000 / 10.000 = 3.0x)
+ */
+export const calcProposalMultiple = (margemPrevista: number, valorSinal: number): number => {
+  if (!valorSinal || valorSinal <= 0) return 0;
+  return Number((margemPrevista / valorSinal).toFixed(1));
 };
 
 /**
@@ -68,18 +103,101 @@ export const checkLeadReadiness = (lead: Lead) => {
 };
 
 /**
+ * User Identity & Theme styling
+ */
+export const getUserTheme = (user?: AppUser | string) => {
+  if (user === 'Queirós') {
+    return {
+      name: 'Queirós',
+      initial: 'Q',
+      badgeBg: 'bg-emerald-50',
+      badgeText: 'text-emerald-800',
+      badgeBorder: 'border-emerald-200',
+      avatarBg: 'bg-emerald-600 text-white',
+      ringColor: 'ring-emerald-500',
+      dot: 'bg-emerald-500'
+    };
+  }
+  if (user === 'Hugo') {
+    return {
+      name: 'Hugo',
+      initial: 'H',
+      badgeBg: 'bg-amber-50',
+      badgeText: 'text-amber-800',
+      badgeBorder: 'border-amber-200',
+      avatarBg: 'bg-amber-600 text-white',
+      ringColor: 'ring-amber-500',
+      dot: 'bg-amber-500'
+    };
+  }
+  return {
+    name: user || 'Geral',
+    initial: (user && user[0]) ? user[0].toUpperCase() : 'CRM',
+    badgeBg: 'bg-stone-100',
+    badgeText: 'text-stone-700',
+    badgeBorder: 'border-stone-200',
+    avatarBg: 'bg-stone-600 text-white',
+    ringColor: 'ring-stone-400',
+    dot: 'bg-stone-400'
+  };
+};
+
+/**
+ * Market rating badge styling
+ */
+export const getMarketRatingBadge = (rating?: MarketDealRating) => {
+  switch (rating) {
+    case 'ouro':
+      return {
+        bg: 'bg-emerald-50',
+        text: 'text-emerald-800',
+        border: 'border-emerald-300',
+        label: '🔥 Oportunidade Incrível'
+      };
+    case 'bom':
+      return {
+        bg: 'bg-teal-50',
+        text: 'text-teal-800',
+        border: 'border-teal-300',
+        label: '🟢 Bom Negócio'
+      };
+    case 'medio':
+      return {
+        bg: 'bg-stone-100',
+        text: 'text-stone-700',
+        border: 'border-stone-300',
+        label: '🟡 Na Média'
+      };
+    case 'fraco':
+      return {
+        bg: 'bg-red-50',
+        text: 'text-red-700',
+        border: 'border-red-300',
+        label: '🔴 Fraco / Caro'
+      };
+    default:
+      return {
+        bg: 'bg-stone-100',
+        text: 'text-stone-600',
+        border: 'border-stone-200',
+        label: 'Estudo de Mercado'
+      };
+  }
+};
+
+/**
  * Color classes helper for Contact Status
  */
 export const getContactStatusBadge = (status: ContactStatus) => {
   switch (status) {
     case 'Não contactado':
-      return { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200', dot: 'bg-red-500' };
+      return { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500' };
     case 'Sem resposta':
-      return { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500' };
+      return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500' };
     case 'Contactado':
-      return { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200', dot: 'bg-blue-500' };
+      return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-500' };
     case 'Reunião marcada':
-      return { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200', dot: 'bg-emerald-500' };
+      return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' };
   }
 };
 
@@ -89,11 +207,11 @@ export const getContactStatusBadge = (status: ContactStatus) => {
 export const getPhotoStatusBadge = (status: PhotoStatus) => {
   switch (status) {
     case 'Sem fotos':
-      return { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
+      return { bg: 'bg-stone-100', text: 'text-stone-600', border: 'border-stone-200' };
     case 'Fotos pedidas':
-      return { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' };
+      return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
     case 'Fotos recebidas':
-      return { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200' };
+      return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
   }
 };
 
@@ -103,15 +221,15 @@ export const getPhotoStatusBadge = (status: PhotoStatus) => {
 export const getPhaseBadge = (fase: LeadPhase) => {
   switch (fase) {
     case 'Nova lead':
-      return { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-300' };
+      return { bg: 'bg-stone-100', text: 'text-stone-700', border: 'border-stone-200' };
     case 'Em análise':
-      return { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-300' };
+      return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' };
     case 'Pronta para proposta':
-      return { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-300' };
+      return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
     case 'CPCV a preparar':
-      return { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300' };
+      return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' };
     case 'Descartada':
-      return { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200' };
+      return { bg: 'bg-stone-100', text: 'text-stone-400', border: 'border-stone-200' };
   }
 };
 
@@ -121,13 +239,13 @@ export const getPhaseBadge = (fase: LeadPhase) => {
 export const getPriorityBadge = (priority: PriorityLevel) => {
   switch (priority) {
     case 'Urgente':
-      return { bg: 'bg-red-500 text-white font-semibold', text: 'Imediatamente' };
+      return { bg: 'bg-red-600 text-white font-semibold', text: 'Imediatamente' };
     case 'Alta':
-      return { bg: 'bg-orange-500 text-white font-medium', text: 'Curto prazo' };
+      return { bg: 'bg-amber-600 text-white font-medium', text: 'Curto prazo' };
     case 'Média':
-      return { bg: 'bg-blue-500 text-white font-normal', text: 'Normal' };
+      return { bg: 'bg-blue-600 text-white font-normal', text: 'Normal' };
     case 'Baixa':
-      return { bg: 'bg-slate-200 text-slate-700 font-normal', text: 'Sem pressa' };
+      return { bg: 'bg-stone-200 text-stone-700 font-normal', text: 'Sem pressa' };
   }
 };
 
@@ -137,15 +255,15 @@ export const getPriorityBadge = (priority: PriorityLevel) => {
 export const getVisitStateBadge = (state: VisitState) => {
   switch (state) {
     case 'Marcada':
-      return { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' };
+      return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' };
     case 'Confirmada':
-      return { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200' };
+      return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
     case 'Realizada':
-      return { bg: 'bg-teal-100', text: 'text-teal-800', border: 'border-teal-200' };
+      return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-300' };
     case 'Reagendar':
-      return { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' };
+      return { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200' };
     case 'Cancelada':
-      return { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200' };
+      return { bg: 'bg-stone-100', text: 'text-stone-400', border: 'border-stone-200' };
   }
 };
 
@@ -155,14 +273,14 @@ export const getVisitStateBadge = (state: VisitState) => {
 export const getProposalStateBadge = (state: ProposalState) => {
   switch (state) {
     case 'Enviada':
-      return { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' };
+      return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' };
     case 'Em negociação':
-      return { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200' };
+      return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
     case 'Aceite':
-      return { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200' };
+      return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-300' };
     case 'Recusada':
-      return { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200' };
+      return { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' };
     case 'Expirada':
-      return { bg: 'bg-slate-100', text: 'text-slate-600', border: 'border-slate-200' };
+      return { bg: 'bg-stone-100', text: 'text-stone-500', border: 'border-stone-200' };
   }
 };

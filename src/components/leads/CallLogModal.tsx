@@ -106,8 +106,7 @@ export const CallLogModal: React.FC = () => {
       text: text.trim(),
       callResult,
       date: dateToSave,
-      nextContactDate: nextContactDate || undefined,
-      author: 'Gestor CRM'
+      nextContactDate: nextContactDate || undefined
     });
 
     // Clear draft for this lead

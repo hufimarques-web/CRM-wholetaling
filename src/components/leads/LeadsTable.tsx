@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { PhoneCall, Edit, Trash2, Calendar, FileText, ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { PhoneCall, Edit, Trash2, Calendar, Sparkles, ArrowUpDown } from 'lucide-react';
 import { useCRM } from '../../context/CRMContext';
 import { Lead, LeadPhase } from '../../types/crm';
-import { formatCurrency, formatDatePT, getContactStatusBadge, getPhotoStatusBadge, getPhaseBadge, getPriorityBadge } from '../../utils/formatters';
+import { formatCurrency, formatDatePT, getContactStatusBadge, getPhaseBadge, getUserTheme } from '../../utils/formatters';
 
 interface LeadsTableProps {
   filteredLeads: Lead[];
   faseFilter?: LeadPhase | 'Todas';
 }
 
-type SortField = 'nomeProprietario' | 'concelho' | 'valorMinimoAbsoluto' | 'margemPotencial' | 'dataEntrada';
+type SortField = 'nomeProprietario' | 'freguesia' | 'valorMinimoAbsoluto' | 'margemPotencial' | 'dataEntrada';
 
 export const LeadsTable: React.FC<LeadsTableProps> = ({ filteredLeads, faseFilter }) => {
   const {
@@ -18,16 +18,13 @@ export const LeadsTable: React.FC<LeadsTableProps> = ({ filteredLeads, faseFilte
     setIsLeadFormOpen,
     setPreselectedVisitLeadId,
     setIsVisitFormOpen,
-    setPreselectedProposalLeadId,
-    setIsProposalFormOpen,
     requestDeleteLead,
-    openCallModal
+    openCallModal,
+    openAIAnalysis
   } = useCRM();
 
   const [sortField, setSortField] = useState<SortField>('dataEntrada');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-
-  const isOnlyInitialPhases = faseFilter === 'Nova lead' || faseFilter === 'Em análise';
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -61,195 +58,179 @@ export const LeadsTable: React.FC<LeadsTableProps> = ({ filteredLeads, faseFilte
   });
 
   return (
-    <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-2xs border border-stone-200 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse text-xs">
           
           {/* Table Header */}
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+            <tr className="bg-[#FAF8F5] border-b border-stone-200 text-stone-700 font-bold uppercase tracking-wider text-[10px]">
+              <th className="py-3 px-4 w-12 text-center">User</th>
               <th
                 onClick={() => handleSort('nomeProprietario')}
-                className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
+                className="py-3 px-4 cursor-pointer hover:bg-stone-100 transition"
               >
                 <div className="flex items-center gap-1">
                   <span>Proprietário</span>
-                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  <ArrowUpDown className="w-3 h-3 text-stone-400" />
                 </div>
               </th>
 
               <th
-                onClick={() => handleSort('concelho')}
-                className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition"
+                onClick={() => handleSort('freguesia')}
+                className="py-3 px-4 cursor-pointer hover:bg-stone-100 transition"
               >
                 <div className="flex items-center gap-1">
-                  <span>Concelho / Freguesia</span>
-                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  <span>Freguesia</span>
+                  <ArrowUpDown className="w-3 h-3 text-stone-400" />
                 </div>
               </th>
 
-              <th className="py-3 px-4">Tipo & Área</th>
+              <th className="py-3 px-4">Preço / m² & Estado</th>
 
               <th
                 onClick={() => handleSort('valorMinimoAbsoluto')}
-                className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition text-right"
+                className="py-3 px-4 cursor-pointer hover:bg-stone-100 transition text-right"
               >
                 <div className="flex items-center justify-end gap-1">
                   <span>Mínimo Absoluto</span>
-                  <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                  <ArrowUpDown className="w-3 h-3 text-stone-400" />
                 </div>
               </th>
 
-              {!isOnlyInitialPhases && (
-                <th
-                  onClick={() => handleSort('margemPotencial')}
-                  className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition text-right"
-                >
-                  <div className="flex items-center justify-end gap-1">
-                    <span>Margem Pot.</span>
-                    <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                  </div>
-                </th>
-              )}
+              <th
+                onClick={() => handleSort('margemPotencial')}
+                className="py-3 px-4 cursor-pointer hover:bg-stone-100 transition text-right"
+              >
+                <div className="flex items-center justify-end gap-1">
+                  <span>Margem Estimada</span>
+                  <ArrowUpDown className="w-3 h-3 text-stone-400" />
+                </div>
+              </th>
 
               <th className="py-3 px-4">Contacto</th>
-              <th className="py-3 px-4">Fotos</th>
               <th className="py-3 px-4">Fase</th>
-              <th className="py-3 px-4">Prioridade</th>
               <th className="py-3 px-4 text-center">Ações</th>
             </tr>
           </thead>
 
           {/* Table Body */}
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-stone-100">
             {sortedLeads.length === 0 ? (
               <tr>
-                <td colSpan={isOnlyInitialPhases ? 9 : 10} className="py-8 text-center text-slate-400">
+                <td colSpan={9} className="py-12 text-center text-stone-400">
                   Nenhuma lead encontrada com os filtros selecionados.
                 </td>
               </tr>
             ) : (
               sortedLeads.map(lead => {
                 const contactBadge = getContactStatusBadge(lead.contacto);
-                const photoBadge = getPhotoStatusBadge(lead.fotos);
                 const phaseBadge = getPhaseBadge(lead.fase);
-                const priorityBadge = getPriorityBadge(lead.prioridade);
-
-                const isRowInitialPhase = lead.fase === 'Nova lead' || lead.fase === 'Em análise';
+                const userTheme = getUserTheme(lead.assignedTo || 'Queirós');
+                const isGoodDeal = lead.deltaMercadoPercent !== undefined && lead.deltaMercadoPercent <= -15;
 
                 return (
                   <tr
                     key={lead.id}
                     onClick={() => setSelectedLeadForDrawer(lead)}
-                    className="hover:bg-blue-50/40 cursor-pointer transition"
+                    className="hover:bg-[#FAF8F5] cursor-pointer transition"
                   >
-                    {/* Owner & Phone */}
-                    <td className="py-3 px-4 font-semibold text-slate-900">
-                      <div>
-                        <span className="block hover:text-blue-600 transition">{lead.nomeProprietario}</span>
-                        <span className="text-[11px] text-slate-500 font-normal">{lead.telefone}</span>
-                      </div>
-                    </td>
-
-                    {/* Location */}
-                    <td className="py-3 px-4 text-slate-700">
-                      <span className="font-medium block">{lead.concelho}</span>
-                      <span className="text-[11px] text-slate-500">{lead.freguesia}</span>
-                    </td>
-
-                    {/* Type & Area */}
-                    <td className="py-3 px-4 text-slate-700">
-                      <span className="font-semibold block">{lead.tipoImovel}</span>
-                      <span className="text-[11px] text-slate-500">{lead.areaM2} m²</span>
-                    </td>
-
-                    {/* Min Abs Value */}
-                    <td className="py-3 px-4 text-right font-extrabold text-slate-900">
-                      {formatCurrency(lead.valorMinimoAbsoluto)}
-                    </td>
-
-                    {/* Potential Margin Column (Hidden if only initial phases filtered) */}
-                    {!isOnlyInitialPhases && (
-                      <td className="py-3 px-4 text-right font-bold text-emerald-600">
-                        {isRowInitialPhase ? (
-                          <span className="text-slate-400 font-normal">-</span>
-                        ) : (
-                          formatCurrency(lead.margemPotencial)
-                        )}
-                      </td>
-                    )}
-
-                    {/* Contact Badge */}
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${contactBadge.bg} ${contactBadge.text} ${contactBadge.border}`}>
-                        {lead.contacto}
+                    {/* User Avatar */}
+                    <td className="py-3 px-3 text-center">
+                      <span
+                        title={`Responsável: ${userTheme.name}`}
+                        className={`w-6 h-6 rounded-lg text-[10px] font-black inline-flex items-center justify-center ${userTheme.avatarBg} shadow-2xs`}
+                      >
+                        {userTheme.initial}
                       </span>
                     </td>
 
-                    {/* Photo Badge */}
+                    {/* Owner & Phone */}
+                    <td className="py-3 px-4 font-bold text-stone-900">
+                      <div>
+                        <span className="block hover:text-amber-800 transition">{lead.nomeProprietario}</span>
+                        <span className="text-[11px] text-stone-400 font-normal">{lead.telefone}</span>
+                      </div>
+                    </td>
+
+                    {/* Freguesia & Type */}
+                    <td className="py-3 px-4 text-stone-700">
+                      <span className="font-semibold block text-stone-800">{lead.freguesia}</span>
+                      <span className="text-[10px] text-stone-400">{lead.tipoImovel} • {lead.areaM2} m²</span>
+                    </td>
+
+                    {/* Price / m2 & Property Condition */}
                     <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${photoBadge.bg} ${photoBadge.text} ${photoBadge.border}`}>
-                        {lead.fotos}
+                      {lead.precoM2 ? (
+                        <div>
+                          <span className="font-extrabold text-stone-900 block">{lead.precoM2} €/m²</span>
+                          <span className="text-[10px] text-stone-500 font-medium">{lead.estadoImovel}</span>
+                        </div>
+                      ) : (
+                        <span className="text-stone-400 text-xs">{lead.estadoImovel || '-'}</span>
+                      )}
+                    </td>
+
+                    {/* Min Abs Value */}
+                    <td className="py-3 px-4 text-right font-extrabold text-stone-900">
+                      {formatCurrency(lead.valorMinimoAbsoluto)}
+                    </td>
+
+                    {/* Potential Margin Column */}
+                    <td className="py-3 px-4 text-right font-black text-emerald-600">
+                      {formatCurrency(lead.margemPotencial)}
+                    </td>
+
+                    {/* Contact Badge */}
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${contactBadge.bg} ${contactBadge.text} ${contactBadge.border}`}>
+                        {lead.contacto}
                       </span>
                     </td>
 
                     {/* Phase Badge */}
                     <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${phaseBadge.bg} ${phaseBadge.text} ${phaseBadge.border}`}>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${phaseBadge.bg} ${phaseBadge.text} ${phaseBadge.border}`}>
                         {lead.fase}
                       </span>
                     </td>
 
-                    {/* Priority Badge */}
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 text-[9px] rounded uppercase font-semibold ${priorityBadge.bg}`}>
-                        {priorityBadge.text}
-                      </span>
-                    </td>
-
-                    {/* Row Actions */}
+                    {/* Actions (100% Editable) */}
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center space-x-1" onClick={e => e.stopPropagation()}>
                         <button
+                          onClick={() => openAIAnalysis(lead)}
+                          className="p-1 text-amber-700 hover:bg-amber-50 rounded-lg transition"
+                          title="Análise AI Deal"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => openCallModal(lead.id)}
-                          className="p-1.5 rounded text-blue-600 bg-blue-50 hover:bg-blue-100 font-semibold transition"
-                          title="Registar chamada com esta lead"
+                          className="p-1 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition"
+                          title="Registar Chamada"
                         >
                           <PhoneCall className="w-3.5 h-3.5" />
                         </button>
-
-                        <button
-                          onClick={() => {
-                            setPreselectedVisitLeadId(lead.id);
-                            setIsVisitFormOpen(true);
-                          }}
-                          className="p-1.5 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition"
-                          title="Marcar Visita"
-                        >
-                          <Calendar className="w-3.5 h-3.5" />
-                        </button>
-
                         <button
                           onClick={() => {
                             setEditingLead(lead);
                             setIsLeadFormOpen(true);
                           }}
-                          className="p-1.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-                          title="Editar"
+                          className="p-1 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition"
+                          title="Editar Lead (100% editável)"
                         >
                           <Edit className="w-3.5 h-3.5" />
                         </button>
-
                         <button
                           onClick={() => requestDeleteLead(lead.id)}
-                          className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition"
-                          title="Eliminar"
+                          className="p-1 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                          title="Eliminar Lead"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
-
                   </tr>
                 );
               })

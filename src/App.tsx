@@ -6,19 +6,28 @@ import { DashboardView } from './views/DashboardView';
 import { LeadsView } from './views/LeadsView';
 import { CalendarView } from './views/CalendarView';
 import { ProposalsView } from './views/ProposalsView';
+import { NotesView } from './views/NotesView';
+import { OperationsView } from './views/OperationsView';
+import { LoginView } from './views/LoginView';
 import { LeadFormModal } from './components/leads/LeadFormModal';
 import { LeadDetailDrawer } from './components/leads/LeadDetailDrawer';
 import { CallLogModal } from './components/leads/CallLogModal';
 import { VisitFormModal } from './components/visits/VisitFormModal';
 import { ProposalFormModal } from './components/proposals/ProposalFormModal';
 import { DeleteConfirmModal } from './components/common/DeleteConfirmModal';
+import { AIDealModal } from './components/common/AIDealModal';
 
 const AppContent: React.FC = () => {
-  const { activeTab } = useCRM();
+  const { activeTab, isAuthenticated } = useCRM();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  // Dedicated Architectural Login View if not authenticated
+  if (!isAuthenticated) {
+    return <LoginView />;
+  }
+
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#F7F5F0] flex flex-col font-sans text-stone-900 selection:bg-amber-200 selection:text-stone-900">
       
       {/* Sidebar Navigation */}
       <Sidebar
@@ -36,8 +45,10 @@ const AppContent: React.FC = () => {
         <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto">
           {activeTab === 'dashboard' && <DashboardView />}
           {activeTab === 'leads' && <LeadsView />}
+          {activeTab === 'notes' && <NotesView />}
           {activeTab === 'calendar' && <CalendarView />}
           {activeTab === 'proposals' && <ProposalsView />}
+          {activeTab === 'operations' && <OperationsView />}
         </main>
       </div>
 
@@ -47,6 +58,7 @@ const AppContent: React.FC = () => {
       <CallLogModal />
       <VisitFormModal />
       <ProposalFormModal />
+      <AIDealModal />
       <DeleteConfirmModal />
 
     </div>

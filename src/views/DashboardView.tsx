@@ -1,136 +1,311 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Building2, PhoneCall, Search, Camera, Calendar, FileText, CheckCircle2, XCircle,
-  AlertTriangle, Clock, TrendingUp, ArrowRight, MapPin, ExternalLink
+  Building2, PhoneCall, Search, Calendar, FileText, CheckCircle2,
+  TrendingUp, ArrowRight, MapPin, Clock, StickyNote, Plus, Pin, Sparkles, User, Check, ShieldCheck
 } from 'lucide-react';
 import { useCRM } from '../context/CRMContext';
-import { formatCurrency, formatDatePT, getContactStatusBadge, getPhaseBadge, getVisitStateBadge, getProposalStateBadge } from '../utils/formatters';
+import { formatCurrency, formatDatePT, formatDateTimePT, getVisitStateBadge, getProposalStateBadge, getUserTheme } from '../utils/formatters';
 
 export const DashboardView: React.FC = () => {
-  const { leads, visits, proposals, setActiveTab, setSelectedLeadForDrawer, setLeadViewMode } = useCRM();
+  const {
+    leads,
+    visits,
+    proposals,
+    notes,
+    operations,
+    addNote,
+    togglePinNote,
+    toggleVisitRealizada,
+    setActiveTab,
+    setSelectedLeadForDrawer,
+    setLeadViewMode,
+    openAIAnalysis,
+    currentUser
+  } = useCRM();
 
-  // Metrics
+  const [dashboardNoteText, setDashboardNoteText] = useState('');
+
+  // Primary Metrics
   const totalLeads = leads.length;
   const porContactar = leads.filter(l => l.contacto === 'Não contactado').length;
-  const emAnalise = leads.filter(l => l.fase === 'Em análise').length;
-  const fotosRecebidas = leads.filter(l => l.fotos === 'Fotos recebidas').length;
-
-  const visitasMarcadas = visits.filter(v => v.estado === 'Marcada' || v.estado === 'Confirmada').length;
-  const propostasEnviadas = proposals.filter(p => p.estado === 'Enviada' || p.estado === 'Em negociação').length;
+  const totalMargem = leads.reduce((acc, curr) => acc + (curr.margemPotencial || 0), 0);
   const propostasAceites = proposals.filter(p => p.estado === 'Aceite').length;
-  const propostasRecusadas = proposals.filter(p => p.estado === 'Recusada').length;
+  const totalSinais = proposals.reduce((acc, curr) => acc + (curr.valorSinal || 0), 0);
+  const operacoesAtivas = operations.filter(o => o.fase !== 'Venda_Fechada' && o.fase !== 'Cancelado').length;
+  const totalLucroFechado = operations
+    .filter(o => o.fase === 'Venda_Fechada')
+    .reduce((acc, curr) => acc + (curr.lucroRealizado || 0), 0);
 
-  // Upcoming Visits (sorted by date/time)
+  // Top Deals by Potential Margin (Sem benchmarks artificiais)
+  const topMarginDeals = [...leads]
+    .sort((a, b) => (b.margemPotencial || 0) - (a.margemPotencial || 0))
+    .slice(0, 4);
+
+  // Upcoming Visits
   const upcomingVisits = [...visits]
     .filter(v => v.estado === 'Marcada' || v.estado === 'Confirmada')
     .sort((a, b) => new Date(`${a.data}T${a.hora}`).getTime() - new Date(`${b.data}T${b.hora}`).getTime())
-    .slice(0, 5);
+    .slice(0, 4);
 
-  // Urgent Leads (Priority: Urgente or Alta)
-  const urgentLeads = leads
-    .filter(l => l.prioridade === 'Urgente' || l.prioridade === 'Alta')
-    .slice(0, 5);
-
-  // Proposals Pending Follow-up
-  const pendingProposals = proposals
+  // Active Proposals with Multiplier
+  const activeProposals = proposals
     .filter(p => p.estado === 'Enviada' || p.estado === 'Em negociação')
-    .slice(0, 5);
+    .slice(0, 4);
 
-  const kpiCards = [
-    { title: 'Total de Leads', value: totalLeads, icon: Building2, color: 'text-blue-600 bg-blue-50 border-blue-200' },
-    { title: 'Por Contactar', value: porContactar, icon: PhoneCall, color: 'text-red-600 bg-red-50 border-red-200' },
-    { title: 'Em Análise', value: emAnalise, icon: Search, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
-    { title: 'Fotos Recebidas', value: fotosRecebidas, icon: Camera, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-    { title: 'Visitas Marcadas', value: visitasMarcadas, icon: Calendar, color: 'text-sky-600 bg-sky-50 border-sky-200' },
-    { title: 'Propostas Enviadas', value: propostasEnviadas, icon: FileText, color: 'text-purple-600 bg-purple-50 border-purple-200' },
-    { title: 'Propostas Aceites', value: propostasAceites, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-    { title: 'Propostas Recusadas', value: propostasRecusadas, icon: XCircle, color: 'text-gray-500 bg-gray-50 border-gray-200' },
-  ];
+  // Dashboard Notes (Sorted: pinned first, then recent)
+  const dashboardNotes = [...notes]
+    .sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    })
+    .slice(0, 6);
+
+  const handleCreateDashboardNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dashboardNoteText.trim()) return;
+
+    addNote({
+      text: dashboardNoteText.trim(),
+      pinned: true
+    });
+
+    setDashboardNoteText('');
+  };
+
+  const userTheme = getUserTheme(currentUser);
 
   return (
     <div className="space-y-6">
       
-      {/* Top Banner */}
-      <div className="bg-[#0B132B] text-white p-6 rounded-2xl shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* Top Banner (Obsidian luxury theme) */}
+      <div className="bg-[#16171B] text-white p-6 rounded-2xl shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-stone-800">
         <div>
-          <h2 className="text-xl font-bold tracking-tight">Painel Operacional — Wholetailing CRM</h2>
-          <p className="text-xs text-slate-300 mt-1">
-            Resumo global do pipeline de arbitragem imobiliária em Aveiro, Coimbra e Viseu.
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs uppercase font-bold tracking-wider text-amber-500">Painel Operacional</span>
+            <span className="text-stone-600">•</span>
+            <span className="text-xs text-stone-300">
+              Sessão iniciada como: <strong className="text-white">{currentUser}</strong>
+            </span>
+          </div>
+          <h2 className="text-xl font-black tracking-tight text-white">Wholetailing CRM Portugal</h2>
+          <p className="text-xs text-stone-400 mt-0.5">
+            Gestão simplificada de oportunidades, estudo de mercado por m² e controlo de propostas.
           </p>
         </div>
-        <button
-          onClick={() => {
-            setLeadViewMode('funnel');
-            setActiveTab('leads');
-          }}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-2 shrink-0"
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              setLeadViewMode('funnel');
+              setActiveTab('leads');
+            }}
+            className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-2"
+          >
+            <span>Ver Funil de Leads</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* 5 Clean Key Metrics with mixed sharp frame & rounded pills */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="bg-white p-4 border border-stone-200 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">Total de Leads</span>
+          <span className="text-2xl font-black text-stone-900 mt-1 block">{totalLeads}</span>
+          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-600">
+            {porContactar} por contactar
+          </span>
+        </div>
+
+        <div className="bg-white p-4 border border-stone-200 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">Margem Potencial</span>
+          <span className="text-xl font-black text-emerald-600 mt-1 block">{formatCurrency(totalMargem)}</span>
+          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">
+            Pipeline arbitragem
+          </span>
+        </div>
+
+        <div className="bg-white p-4 border border-stone-200 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">Sinais CPCV (10%)</span>
+          <span className="text-xl font-black text-amber-800 mt-1 block">{formatCurrency(totalSinais)}</span>
+          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800">
+            Capital de sinal
+          </span>
+        </div>
+
+        <div
+          onClick={() => setActiveTab('operations')}
+          className="bg-white p-4 border border-stone-200 shadow-2xs cursor-pointer hover:border-amber-400 transition"
         >
-          <span>Ver Funil Completo</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">Operações & CPCV</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-600" />
+          </div>
+          <span className="text-2xl font-black text-stone-900 mt-1 block">{operacoesAtivas}</span>
+          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-900 text-white">
+            {propostasAceites} aceites no total
+          </span>
+        </div>
+
+        <div
+          onClick={() => setActiveTab('operations')}
+          className="bg-emerald-950 text-white p-4 border border-emerald-800 shadow-2xs cursor-pointer hover:bg-emerald-900 transition"
+        >
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 block">Lucro Realizado</span>
+          <span className="text-xl font-black text-emerald-400 mt-1 block">{formatCurrency(totalLucroFechado)}</span>
+          <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-800 text-emerald-200">
+            Deals concluídos
+          </span>
+        </div>
       </div>
 
-      {/* Grid of 8 Metric KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {kpiCards.map((card, idx) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={idx}
-              className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:shadow-md transition flex items-center justify-between"
-            >
-              <div>
-                <span className="text-[11px] font-semibold text-slate-500 block leading-tight">{card.title}</span>
-                <span className="text-2xl font-extrabold text-slate-900 mt-1 block">{card.value}</span>
-              </div>
-              <div className={`p-3 rounded-xl border ${card.color}`}>
-                <Icon className="w-5 h-5" />
-              </div>
+      {/* REQUIREMENT 5: PRIMARY NOTES BOARD IN THE DASHBOARD */}
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-2xs p-5 space-y-4">
+        <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+              <StickyNote className="w-4 h-4" />
             </div>
-          );
-        })}
+            <div>
+              <h3 className="font-extrabold text-sm text-stone-900 leading-tight">
+                Quadro Primário de Notas & Ações
+              </h3>
+              <p className="text-[11px] text-stone-500">
+                Registo imediato e acompanhamento direto das notas de Queirós e Hugo
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setActiveTab('notes')}
+            className="text-xs font-bold text-amber-800 hover:text-amber-900 underline flex items-center gap-1"
+          >
+            <span>Ver Todas as Notas</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Quick Note Input */}
+        <form onSubmit={handleCreateDashboardNote} className="flex gap-2">
+          <input
+            type="text"
+            value={dashboardNoteText}
+            onChange={e => setDashboardNoteText(e.target.value)}
+            placeholder={`Escreva uma nota rápida ou ação pendente (Autor: ${currentUser})...`}
+            className="flex-1 px-3.5 py-2 bg-[#FAF8F5] border border-stone-200 rounded-xl text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-amber-500 transition"
+          />
+          <button
+            type="submit"
+            className="px-4 py-2 bg-stone-900 hover:bg-black text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5 shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Adicionar</span>
+          </button>
+        </form>
+
+        {/* Notes Feed Grid */}
+        {dashboardNotes.length === 0 ? (
+          <p className="text-center py-6 text-stone-400 text-xs">Sem notas registadas.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+            {dashboardNotes.map(note => {
+              const authorTheme = getUserTheme(note.author);
+              return (
+                <div
+                  key={note.id}
+                  className={`p-3 rounded-xl border text-xs flex flex-col justify-between space-y-2 transition ${
+                    note.pinned ? 'bg-[#FAF8F4] border-amber-300 shadow-2xs' : 'bg-[#FAF8F5] border-stone-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-4 h-4 rounded text-[9px] font-black flex items-center justify-center ${authorTheme.avatarBg}`}>
+                        {authorTheme.initial}
+                      </span>
+                      <span className="font-bold text-stone-800 text-[11px]">{authorTheme.name}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-stone-400">{formatDateTimePT(note.date)}</span>
+                      <button
+                        onClick={() => togglePinNote(note.id)}
+                        className={`p-1 rounded ${note.pinned ? 'text-amber-600' : 'text-stone-300 hover:text-stone-600'}`}
+                        title={note.pinned ? 'Desafixar' : 'Fixar'}
+                      >
+                        <Pin className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-stone-700 leading-relaxed line-clamp-3">
+                    {note.text}
+                  </p>
+
+                  {note.leadTitle && (
+                    <div className="pt-1 border-t border-stone-200/60">
+                      <span className="text-[10px] font-semibold text-amber-800 truncate block">
+                        📍 {note.leadTitle}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Pipeline Summary & Action Sections */}
+      {/* Middle Grid: Top Deals & Upcoming Visits & Proposals */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Upcoming Visits */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-600" />
-              Próximas Visitas ({upcomingVisits.length})
-            </h3>
+        {/* TOP DEALS BY MARGIN */}
+        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-600" />
+              <h3 className="font-bold text-stone-900 text-xs uppercase tracking-wider">
+                Maiores Margens Potenciais
+              </h3>
+            </div>
             <button
-              onClick={() => setActiveTab('calendar')}
-              className="text-xs text-blue-600 hover:underline font-semibold"
+              onClick={() => setActiveTab('leads')}
+              className="text-xs text-amber-800 hover:underline font-bold"
             >
-              Ver Calendário
+              Ver Todas
             </button>
           </div>
 
-          {upcomingVisits.length === 0 ? (
-            <p className="text-slate-400 text-xs text-center py-6">Sem visitas agendadas em breve.</p>
+          {topMarginDeals.length === 0 ? (
+            <p className="text-stone-400 text-xs text-center py-6">Nenhuma lead registada de momento.</p>
           ) : (
-            <div className="space-y-3">
-              {upcomingVisits.map(v => {
-                const st = getVisitStateBadge(v.estado);
+            <div className="space-y-2.5">
+              {topMarginDeals.map(l => {
+                const userTheme = getUserTheme(l.assignedTo);
                 return (
-                  <div key={v.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+                  <div
+                    key={l.id}
+                    onClick={() => setSelectedLeadForDrawer(l)}
+                    className="p-3 bg-[#FAF8F5] hover:bg-[#F5F1E8] rounded-xl border border-stone-200 text-xs space-y-1.5 cursor-pointer transition"
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900">{v.nomeProprietario}</span>
-                      <span className={`px-2 py-0.5 text-[9px] rounded font-semibold border ${st.bg} ${st.text} ${st.border}`}>
-                        {v.estado}
+                      <span className="font-bold text-stone-900">{l.nomeProprietario}</span>
+                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-stone-100 text-stone-700 border border-stone-200">
+                        {l.tipoImovel}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-600 flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-slate-400" />
-                      {v.moradaZona}, {v.concelhoFreguesia}
-                    </p>
-                    <p className="text-[10px] text-blue-600 font-semibold flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {formatDatePT(v.data)} às {v.hora} • Agente: {v.responsavel}
-                    </p>
+
+                    <div className="flex items-center justify-between text-[11px] text-stone-600">
+                      <span>{l.freguesia}</span>
+                      {l.precoM2 ? (
+                        <span className="font-bold text-stone-900">{l.precoM2} €/m²</span>
+                      ) : null}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-stone-200/60">
+                      <span className="text-stone-500">Mín: {formatCurrency(l.valorMinimoAbsoluto)}</span>
+                      <span className="text-emerald-700 font-extrabold">Margem: {formatCurrency(l.margemPotencial)}</span>
+                    </div>
                   </div>
                 );
               })}
@@ -138,89 +313,107 @@ export const DashboardView: React.FC = () => {
           )}
         </div>
 
-        {/* Urgent Leads */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-600" />
-              Leads Urgentes ({urgentLeads.length})
-            </h3>
+        {/* UPCOMING VISITS (WITH 1-CLICK TOGGLE REALIZADA) */}
+        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-stone-700" />
+              <h3 className="font-bold text-stone-900 text-xs uppercase tracking-wider">
+                Próximas Visitas ({upcomingVisits.length})
+              </h3>
+            </div>
             <button
-              onClick={() => {
-                setLeadViewMode('table');
-                setActiveTab('leads');
-              }}
-              className="text-xs text-blue-600 hover:underline font-semibold"
+              onClick={() => setActiveTab('calendar')}
+              className="text-xs text-amber-800 hover:underline font-bold"
             >
-              Ver Todas
+              Calendário
             </button>
           </div>
 
-          {urgentLeads.length === 0 ? (
-            <p className="text-slate-400 text-xs text-center py-6">Nenhuma lead urgente pendente.</p>
+          {upcomingVisits.length === 0 ? (
+            <p className="text-stone-400 text-xs text-center py-6">Sem visitas agendadas em breve.</p>
           ) : (
-            <div className="space-y-3">
-              {urgentLeads.map(l => (
-                <div
-                  key={l.id}
-                  onClick={() => setSelectedLeadForDrawer(l)}
-                  className="p-3 bg-slate-50 hover:bg-blue-50/50 rounded-xl border border-slate-200 text-xs space-y-1 cursor-pointer transition"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900">{l.nomeProprietario}</span>
-                    <span className="px-2 py-0.5 bg-red-500 text-white rounded text-[9px] font-bold">
-                      {l.prazoPretendido}
-                    </span>
+            <div className="space-y-2.5">
+              {upcomingVisits.map(v => {
+                const userTheme = getUserTheme(v.assignedUser || v.responsavel);
+                return (
+                  <div key={v.id} className="p-3 bg-[#FAF8F5] rounded-xl border border-stone-200 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-stone-900">{v.nomeProprietario}</span>
+                      <button
+                        onClick={() => toggleVisitRealizada(v.id)}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white hover:bg-emerald-50 text-stone-700 hover:text-emerald-800 border border-stone-300 transition flex items-center gap-1"
+                      >
+                        <Check className="w-3 h-3 text-emerald-600" />
+                        <span>Marcar Feita</span>
+                      </button>
+                    </div>
+
+                    <p className="text-[11px] text-stone-600 flex items-center gap-1 truncate">
+                      <MapPin className="w-3 h-3 text-stone-400 shrink-0" />
+                      {v.moradaZona}, {v.concelhoFreguesia}
+                    </p>
+
+                    <div className="flex items-center justify-between text-[10px] text-stone-500 pt-1 border-t border-stone-200/60">
+                      <span>{formatDatePT(v.data)} às {v.hora}</span>
+                      <span className="font-bold text-stone-700">Resp: {userTheme.name}</span>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-600">{l.concelho} ({l.freguesia}) • {l.tipoImovel}</p>
-                  <div className="flex items-center justify-between text-[11px] pt-1">
-                    <span className="text-slate-500">Mín: <strong>{formatCurrency(l.valorMinimoAbsoluto)}</strong></span>
-                    <span className="text-emerald-600 font-bold">Margem: {formatCurrency(l.margemPotencial)}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Proposals Pending Follow-up */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <FileText className="w-4 h-4 text-purple-600" />
-              Propostas Pendentes ({pendingProposals.length})
-            </h3>
+        {/* ACTIVE PROPOSALS WITH DOWN PAYMENT MULTIPLE */}
+        <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-stone-700" />
+              <h3 className="font-bold text-stone-900 text-xs uppercase tracking-wider">
+                Propostas & Múltiplos
+              </h3>
+            </div>
             <button
               onClick={() => setActiveTab('proposals')}
-              className="text-xs text-blue-600 hover:underline font-semibold"
+              className="text-xs text-amber-800 hover:underline font-bold"
             >
-              Ir para Propostas
+              Propostas
             </button>
           </div>
 
-          {pendingProposals.length === 0 ? (
-            <p className="text-slate-400 text-xs text-center py-6">Nenhuma proposta pendente.</p>
+          {activeProposals.length === 0 ? (
+            <p className="text-stone-400 text-xs text-center py-6">Nenhuma proposta ativa em negociação.</p>
           ) : (
-            <div className="space-y-3">
-              {pendingProposals.map(p => {
+            <div className="space-y-2.5">
+              {activeProposals.map(p => {
                 const st = getProposalStateBadge(p.estado);
                 return (
-                  <div key={p.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+                  <div key={p.id} className="p-3 bg-[#FAF8F5] rounded-xl border border-stone-200 text-xs space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900">{p.nomeProprietario}</span>
-                      <span className={`px-2 py-0.5 text-[9px] rounded font-semibold border ${st.bg} ${st.text} ${st.border}`}>
+                      <span className="font-bold text-stone-900">{p.nomeProprietario}</span>
+                      <span className={`px-2 py-0.5 text-[9px] rounded font-bold border ${st.bg} ${st.text} ${st.border}`}>
                         {p.estado}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-600">Proposta: <strong className="text-blue-600">{formatCurrency(p.valorProposta)}</strong></span>
-                      <span className="text-slate-600">Margem: <strong className="text-emerald-600">{formatCurrency(p.margemPrevista)}</strong></span>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                      <div>
+                        <span className="text-[9px] text-stone-400 block uppercase font-bold">Proposta</span>
+                        <span className="font-bold text-stone-900">{formatCurrency(p.valorProposta)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-stone-400 block uppercase font-bold">Sinal (10%)</span>
+                        <span className="font-bold text-amber-800">{formatCurrency(p.valorSinal)}</span>
+                      </div>
                     </div>
-                    {p.proximoFollowUp && (
-                      <p className="text-[10px] text-purple-700 font-medium">
-                        Follow-Up Agendado: {formatDatePT(p.proximoFollowUp)}
-                      </p>
-                    )}
+
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-stone-200/60">
+                      <span className="text-emerald-700 font-bold">Margem: {formatCurrency(p.margemPrevista)}</span>
+                      <span className="px-2 py-0.5 rounded bg-white text-emerald-800 border border-stone-200 font-black text-[10px]">
+                        {p.multiploSinal || '-'}x Múltiplo
+                      </span>
+                    </div>
                   </div>
                 );
               })}

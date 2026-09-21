@@ -1,0 +1,149 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Lead {
+  id                  String   @id @default(uuid())
+  nomeProprietario    String
+  telefone            String
+  email               String?
+  freguesia           String
+  concelho            String?
+  moradaZona          String?
+  tipoImovel          String
+  estadoImovel        String
+  areaM2              Float?
+  origem              String
+  valorMinimoAbsoluto Float
+  flexibilidade       String
+  prazoPretendido     String
+  margemPotencial     Float
+  precoM2             Float?
+  mediaFreguesiaM2    Float?
+  deltaMercadoPercent Float?
+  etiquetaMercado     String?
+  ratingMercado       String?
+  contacto            String
+  fotos               String
+  fase                String
+  prioridade          String
+  assignedTo          String
+  dataEntrada         String
+  isDemo              Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  notas      Note[]
+  visits     Visit[]
+  proposals  Proposal[]
+  operations DealOperation[]
+}
+
+model Visit {
+  id                String   @id @default(uuid())
+  leadId            String
+  nomeProprietario  String
+  moradaZona        String?
+  concelhoFreguesia String
+  data              String
+  hora              String
+  responsavel       String
+  assignedUser      String
+  estado            String
+  notas             String?
+  resultado         String
+  realizadaEm       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model Proposal {
+  id                      String   @id @default(uuid())
+  leadId                  String
+  nomeProprietario        String
+  moradaConcelhoFreguesia String
+  valorMinimoAbsoluto     Float
+  valorProposta           Float
+  valorSinal              Float
+  valorRevenda            Float
+  margemPrevista          Float
+  spread                  Float
+  multiploSinal           Float
+  dataEnvio               String
+  estado                  String
+  assignedUser            String
+  proximoFollowUp         String?
+  notas                   String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model Note {
+  id              String   @id @default(uuid())
+  author          String
+  assignedUser    String?
+  date            String
+  text            String
+  type            String?  @default("general")
+  callResult      String?
+  nextContactDate String?
+  leadId          String?
+  leadTitle       String?
+  pinned          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model DealOperation {
+  id                  String   @id @default(uuid())
+  leadId              String
+  proposalId          String?
+  nomeProprietario    String
+  freguesia           String
+  tipoImovel          String
+  areaM2              Float?
+  valorCompraAcordado Float
+  valorSinalPago      Float
+  valorRevendaAlvo    Float
+  margemPrevista      Float
+  multiploSinal       Float
+  fase                String
+  responsavel         String
+  dataAceitacao       String
+  dataAssinaturaCPCV  String?
+  dataLimiteEscritura String?
+  dataVendaFechada    String?
+  compradorNome       String?
+  compradorTelefone   String?
+  valorVendaRealizado Float?
+  lucroRealizado      Float?
+  checklistJson       String   @default("{}")
+  notas               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  lead  Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  notes OperationNote[]
+}
+
+model OperationNote {
+  id          String   @id @default(uuid())
+  operationId String
+  author      String
+  text        String
+  date        String
+  createdAt   DateTime @default(now())
+
+  operation DealOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+}

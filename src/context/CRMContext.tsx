@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Lead, Visit, Proposal, LeadPhase, ContactStatus, Note, CallResult } from '../types/crm';
-import { INITIAL_LEADS, INITIAL_VISITS, INITIAL_PROPOSALS } from '../data/initialData';
-import { calcLeadPotentialMargin, calcProposalMargin, calcProposalSpread } from '../utils/formatters';
+import { Lead, Visit, Proposal, LeadPhase, ContactStatus, Note, CallResult, AppUser, DealOperation, OperationStage, DocumentChecklist, OperationNote } from '../types/crm';
+import { INITIAL_LEADS, INITIAL_VISITS, INITIAL_PROPOSALS, INITIAL_NOTES, INITIAL_OPERATIONS } from '../data/initialData';
+import { analyzeLeadMarket } from '../data/marketData';
+import { calcLeadPotentialMargin, calcProposalMargin, calcProposalSpread, calcDefaultSinal, calcProposalMultiple } from '../utils/formatters';
 
 interface LeadDeleteImpact {
   lead: Lead;
@@ -15,20 +16,31 @@ interface AddCallNoteParams {
   callResult: CallResult;
   date: string;
   nextContactDate?: string;
-  author?: string;
 }
 
 interface CRMContextType {
-  leads: Lead[];
-  visits: Visit[];
-  proposals: Proposal[];
-  activeTab: 'dashboard' | 'leads' | 'calendar' | 'proposals';
-  setActiveTab: (tab: 'dashboard' | 'leads' | 'calendar' | 'proposals') => void;
+  // Authentication & Session
+  isAuthenticated: boolean;
+  currentUser: AppUser;
+  setCurrentUser: (user: AppUser) => void;
+  login: (user: AppUser) => void;
+  logout: () => void;
+
+  // Navigation & Search
+  activeTab: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations';
+  setActiveTab: (tab: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations') => void;
   leadViewMode: 'funnel' | 'table';
   setLeadViewMode: (mode: 'funnel' | 'table') => void;
   globalSearch: string;
   setGlobalSearch: (query: string) => void;
   
+  // Data States
+  leads: Lead[];
+  visits: Visit[];
+  proposals: Proposal[];
+  notes: Note[];
+  operations: DealOperation[];
+
   // Modals & Drawer state triggers
   selectedLeadForDrawer: Lead | null;
   setSelectedLeadForDrawer: (lead: Lead | null) => void;
@@ -44,6 +56,7 @@ interface CRMContextType {
   setCallModalLeadId: (leadId: string | null) => void;
   openCallModal: (leadId: string) => void;
 
+  // Visit Modal State
   isVisitFormOpen: boolean;
   setIsVisitFormOpen: (open: boolean) => void;
   preselectedVisitLeadId: string | null;
@@ -51,6 +64,7 @@ interface CRMContextType {
   editingVisit: Visit | null;
   setEditingVisit: (visit: Visit | null) => void;
   
+  // Proposal Modal State
   isProposalFormOpen: boolean;
   setIsProposalFormOpen: (open: boolean) => void;
   preselectedProposalLeadId: string | null;
@@ -58,42 +72,103 @@ interface CRMContextType {
   editingProposal: Proposal | null;
   setEditingProposal: (proposal: Proposal | null) => void;
   
+  // AI Deal Assistant Modal State
+  isAIModalOpen: boolean;
+  setIsAIModalOpen: (open: boolean) => void;
+  aiTargetLead: Lead | null;
+  setAITargetLead: (lead: Lead | null) => void;
+  openAIAnalysis: (lead: Lead) => void;
+
   // Delete confirm state
   deleteImpactModal: LeadDeleteImpact | null;
   setDeleteImpactModal: (impact: LeadDeleteImpact | null) => void;
 
   // Actions
-  addLead: (leadData: Omit<Lead, 'id' | 'dataEntrada' | 'margemPotencial' | 'notas'> & { notas?: Note[] }) => Lead;
+  addLead: (leadData: Omit<Lead, 'id' | 'dataEntrada' | 'margemPotencial' | 'notas' | 'assignedTo'> & { notas?: Note[] }) => Lead;
   updateLead: (lead: Lead) => void;
   requestDeleteLead: (leadId: string) => void;
   confirmDeleteLead: (leadId: string) => void;
   updateLeadPhase: (leadId: string, newPhase: LeadPhase) => void;
-  addNoteToLead: (leadId: string, text: string, author?: string) => void;
+  addNoteToLead: (leadId: string, text: string) => void;
   addCallNoteToLead: (params: AddCallNoteParams) => void;
 
-  addVisit: (visitData: Omit<Visit, 'id' | 'nomeProprietario' | 'moradaZona' | 'concelhoFreguesia'>) => Visit;
+  // Notes Actions
+  addNote: (noteData: Omit<Note, 'id' | 'date' | 'author' | 'assignedUser'> & { date?: string }) => Note;
+  updateNote: (note: Note) => void;
+  deleteNote: (noteId: string) => void;
+  togglePinNote: (noteId: string) => void;
+
+  // Visits Actions
+  addVisit: (visitData: Omit<Visit, 'id' | 'nomeProprietario' | 'moradaZona' | 'concelhoFreguesia' | 'responsavel' | 'assignedUser'>) => Visit;
   updateVisit: (visit: Visit) => void;
   deleteVisit: (visitId: string) => void;
+  toggleVisitRealizada: (visitId: string) => void;
 
-  addProposal: (proposalData: Omit<Proposal, 'id' | 'nomeProprietario' | 'moradaConcelhoFreguesia' | 'margemPrevista' | 'spread'>) => Proposal;
+  // Proposals Actions
+  addProposal: (proposalData: Omit<Proposal, 'id' | 'nomeProprietario' | 'moradaConcelhoFreguesia' | 'margemPrevista' | 'spread' | 'multiploSinal' | 'assignedUser'> & { valorSinal?: number }) => Proposal;
   updateProposal: (proposal: Proposal) => void;
   deleteProposal: (proposalId: string) => void;
   acceptProposal: (proposalId: string) => void;
 
-  resetToDemoData: () => void;
+  // Operations Actions (Pós-Aceitação / Do CPCV à Venda)
+  addOperation: (opData: Omit<DealOperation, 'id'>) => DealOperation;
+  updateOperation: (op: DealOperation) => void;
+  updateOperationStage: (opId: string, stage: OperationStage) => void;
+  toggleChecklistDoc: (opId: string, docKey: keyof DocumentChecklist) => void;
+  deleteOperation: (opId: string) => void;
+  addOperationNote: (opId: string, text: string) => void;
 }
 
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
 
+const getSafeLocalStorage = (key: string): string | null => {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+
+const setSafeLocalStorage = (key: string, value: string) => {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+};
+
 export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return getSafeLocalStorage('wt_crm_auth') === 'true';
+  });
+
+  const [currentUser, setCurrentUser] = useState<AppUser>(() => {
+    const saved = getSafeLocalStorage('wt_crm_current_user');
+    if (saved === 'Queirós' || saved === 'Hugo') return saved;
+    return 'Queirós';
+  });
+
+  const login = (user: AppUser) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    setSafeLocalStorage('wt_crm_current_user', user);
+    setSafeLocalStorage('wt_crm_auth', 'true');
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    setSafeLocalStorage('wt_crm_auth', 'false');
+  };
+
   // Navigation & Search
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'calendar' | 'proposals'>('leads');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations'>('dashboard');
   const [leadViewMode, setLeadViewMode] = useState<'funnel' | 'table'>('funnel');
   const [globalSearch, setGlobalSearch] = useState('');
 
-  // Main Data States with LocalStorage Initialization
+  // Main Data States with LocalStorage Initialization (SSR Safe)
   const [leads, setLeads] = useState<Lead[]>(() => {
-    const saved = localStorage.getItem('wt_crm_leads');
+    const saved = getSafeLocalStorage('wt_crm_leads');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { console.error(e); }
     }
@@ -101,7 +176,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [visits, setVisits] = useState<Visit[]>(() => {
-    const saved = localStorage.getItem('wt_crm_visits');
+    const saved = getSafeLocalStorage('wt_crm_visits');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { console.error(e); }
     }
@@ -109,11 +184,27 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [proposals, setProposals] = useState<Proposal[]>(() => {
-    const saved = localStorage.getItem('wt_crm_proposals');
+    const saved = getSafeLocalStorage('wt_crm_proposals');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { console.error(e); }
     }
     return INITIAL_PROPOSALS;
+  });
+
+  const [notes, setNotes] = useState<Note[]>(() => {
+    const saved = getSafeLocalStorage('wt_crm_notes');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return INITIAL_NOTES;
+  });
+
+  const [operations, setOperations] = useState<DealOperation[]>(() => {
+    const saved = getSafeLocalStorage('wt_crm_operations');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return INITIAL_OPERATIONS;
   });
 
   // Modal / Drawer Controls
@@ -133,7 +224,27 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [preselectedProposalLeadId, setPreselectedProposalLeadId] = useState<string | null>(null);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
 
+  // AI Deal Assistant
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [aiTargetLead, setAITargetLead] = useState<Lead | null>(null);
+
   const [deleteImpactModal, setDeleteImpactModal] = useState<LeadDeleteImpact | null>(null);
+
+  // Load from Prisma via Next.js API bootstrap
+  useEffect(() => {
+    fetch('/api/bootstrap')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.leads) {
+          setLeads(data.leads);
+          setVisits(data.visits);
+          setProposals(data.proposals);
+          setNotes(data.notes);
+          setOperations(data.operations);
+        }
+      })
+      .catch(err => console.warn('Prisma bootstrap loaded offline/local fallback:', err));
+  }, []);
 
   // Sync with LocalStorage
   useEffect(() => {
@@ -149,6 +260,14 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [proposals]);
 
   useEffect(() => {
+    localStorage.setItem('wt_crm_notes', JSON.stringify(notes));
+  }, [notes]);
+
+  useEffect(() => {
+    localStorage.setItem('wt_crm_operations', JSON.stringify(operations));
+  }, [operations]);
+
+  useEffect(() => {
     if (selectedLeadForDrawer) {
       const updated = leads.find(l => l.id === selectedLeadForDrawer.id);
       if (updated) setSelectedLeadForDrawer(updated);
@@ -160,17 +279,30 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsCallModalOpen(true);
   };
 
+  const openAIAnalysis = (lead: Lead) => {
+    setAITargetLead(lead);
+    setIsAIModalOpen(true);
+  };
+
   // LEAD ACTIONS
-  const addLead = (leadData: Omit<Lead, 'id' | 'dataEntrada' | 'margemPotencial' | 'notas'> & { notas?: Note[] }): Lead => {
+  const addLead = (leadData: Omit<Lead, 'id' | 'dataEntrada' | 'margemPotencial' | 'notas' | 'assignedTo'> & { notas?: Note[] }): Lead => {
     const id = 'lead-' + Date.now();
     const dataEntrada = new Date().toISOString().split('T')[0];
-    const margemPotencial = calcLeadPotentialMargin(leadData.valorEstimadoAvaliacao, leadData.valorMinimoAbsoluto);
     
+    // Automatic Aveiro parish market benchmark study
+    const precoM2 = leadData.areaM2 && leadData.areaM2 > 0
+      ? Math.round(leadData.valorMinimoAbsoluto / leadData.areaM2)
+      : undefined;
+    const margemPotencial = Math.round(leadData.valorMinimoAbsoluto * 0.30);
+
+    // Locked to session active user!
     const newLead: Lead = {
       ...leadData,
       id,
       dataEntrada,
       margemPotencial,
+      assignedTo: currentUser,
+      precoM2,
       notas: leadData.notas || []
     };
 
@@ -179,8 +311,20 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateLead = (updatedLead: Lead) => {
-    const margemPotencial = calcLeadPotentialMargin(updatedLead.valorEstimadoAvaliacao, updatedLead.valorMinimoAbsoluto);
-    const finalLead = { ...updatedLead, margemPotencial };
+    const precoM2 = updatedLead.areaM2 && updatedLead.areaM2 > 0
+      ? Math.round(updatedLead.valorMinimoAbsoluto / updatedLead.areaM2)
+      : undefined;
+    const margemPotencial = Math.round(updatedLead.valorMinimoAbsoluto * 0.30);
+
+    const finalLead: Lead = {
+      ...updatedLead,
+      precoM2,
+      margemPotencial,
+      deltaMercadoPercent: undefined,
+      etiquetaMercado: undefined,
+      ratingMercado: undefined,
+      mediaFreguesiaM2: undefined
+    };
 
     setLeads(prev => prev.map(l => l.id === finalLead.id ? finalLead : l));
   };
@@ -189,14 +333,16 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, fase: newPhase } : l));
   };
 
-  const addNoteToLead = (leadId: string, text: string, author: string = 'Equipa CRM') => {
+  const addNoteToLead = (leadId: string, text: string) => {
     if (!text.trim()) return;
     const newNote: Note = {
       id: 'note-' + Date.now(),
-      author,
+      author: currentUser,
+      assignedUser: currentUser,
       date: new Date().toISOString(),
       text: text.trim(),
-      type: 'general'
+      type: 'general',
+      leadId
     };
 
     setLeads(prev => prev.map(l => {
@@ -208,24 +354,34 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return l;
     }));
+
+    const targetLead = leads.find(l => l.id === leadId);
+    setNotes(prev => [
+      {
+        ...newNote,
+        leadTitle: targetLead ? `${targetLead.nomeProprietario} (${targetLead.freguesia})` : undefined
+      },
+      ...prev
+    ]);
   };
 
-  const addCallNoteToLead = ({ leadId, text, callResult, date, nextContactDate, author = 'Gestor CRM' }: AddCallNoteParams) => {
+  const addCallNoteToLead = ({ leadId, text, callResult, date, nextContactDate }: AddCallNoteParams) => {
     if (!text.trim()) return;
     
     const newNote: Note = {
       id: 'note-call-' + Date.now(),
-      author,
+      author: currentUser,
+      assignedUser: currentUser,
       date: date || new Date().toISOString(),
       text: text.trim(),
       type: 'call',
       callResult,
-      nextContactDate
+      nextContactDate,
+      leadId
     };
 
     setLeads(prev => prev.map(l => {
       if (l.id === leadId) {
-        // Coherent contact status updating
         let newContactStatus: ContactStatus = l.contacto;
         if (callResult === 'Contactado' && l.contacto !== 'Reunião marcada') {
           newContactStatus = 'Contactado';
@@ -243,6 +399,53 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return l;
     }));
+
+    const targetLead = leads.find(l => l.id === leadId);
+    setNotes(prev => [
+      {
+        ...newNote,
+        leadTitle: targetLead ? `${targetLead.nomeProprietario} (${targetLead.freguesia})` : undefined
+      },
+      ...prev
+    ]);
+  };
+
+  // GENERAL NOTES ACTIONS
+  const addNote = (noteData: Omit<Note, 'id' | 'date' | 'author' | 'assignedUser'> & { date?: string }): Note => {
+    const newNote: Note = {
+      ...noteData,
+      id: 'note-' + Date.now(),
+      author: currentUser,
+      assignedUser: currentUser,
+      date: noteData.date || new Date().toISOString()
+    };
+    setNotes(prev => [newNote, ...prev]);
+
+    if (newNote.leadId) {
+      setLeads(prev => prev.map(l => {
+        if (l.id === newNote.leadId) {
+          return {
+            ...l,
+            notas: [newNote, ...(l.notas || [])]
+          };
+        }
+        return l;
+      }));
+    }
+
+    return newNote;
+  };
+
+  const updateNote = (updatedNote: Note) => {
+    setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+  };
+
+  const deleteNote = (noteId: string) => {
+    setNotes(prev => prev.filter(n => n.id !== noteId));
+  };
+
+  const togglePinNote = (noteId: string) => {
+    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, pinned: !n.pinned } : n));
   };
 
   const requestDeleteLead = (leadId: string) => {
@@ -263,6 +466,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLeads(prev => prev.filter(l => l.id !== leadId));
     setVisits(prev => prev.filter(v => v.leadId !== leadId));
     setProposals(prev => prev.filter(p => p.leadId !== leadId));
+    setNotes(prev => prev.filter(n => n.leadId !== leadId));
+    setOperations(prev => prev.filter(o => o.leadId !== leadId));
     setDeleteImpactModal(null);
     if (selectedLeadForDrawer?.id === leadId) {
       setSelectedLeadForDrawer(null);
@@ -270,7 +475,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // VISIT ACTIONS
-  const addVisit = (visitData: Omit<Visit, 'id' | 'nomeProprietario' | 'moradaZona' | 'concelhoFreguesia'>): Visit => {
+  const addVisit = (visitData: Omit<Visit, 'id' | 'nomeProprietario' | 'moradaZona' | 'concelhoFreguesia' | 'responsavel' | 'assignedUser'>): Visit => {
     const lead = leads.find(l => l.id === visitData.leadId);
     const id = 'vis-' + Date.now();
 
@@ -278,8 +483,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...visitData,
       id,
       nomeProprietario: lead ? lead.nomeProprietario : 'N/A',
-      moradaZona: lead ? lead.moradaZona : 'N/A',
-      concelhoFreguesia: lead ? `${lead.concelho}, ${lead.freguesia}` : 'N/A',
+      concelhoFreguesia: lead ? lead.freguesia : 'N/A',
+      responsavel: currentUser,
+      assignedUser: currentUser,
+      realizadaEm: visitData.estado === 'Realizada' ? new Date().toISOString() : undefined
     };
 
     setVisits(prev => [newVisit, ...prev]);
@@ -293,11 +500,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateVisit = (updatedVisit: Visit) => {
     const lead = leads.find(l => l.id === updatedVisit.leadId);
-    const finalVisit = {
+    const finalVisit: Visit = {
       ...updatedVisit,
       nomeProprietario: lead ? lead.nomeProprietario : updatedVisit.nomeProprietario,
-      moradaZona: lead ? lead.moradaZona : updatedVisit.moradaZona,
-      concelhoFreguesia: lead ? `${lead.concelho}, ${lead.freguesia}` : updatedVisit.concelhoFreguesia
+      concelhoFreguesia: lead ? lead.freguesia : updatedVisit.concelhoFreguesia
     };
 
     setVisits(prev => prev.map(v => v.id === finalVisit.id ? finalVisit : v));
@@ -307,21 +513,45 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setVisits(prev => prev.filter(v => v.id !== visitId));
   };
 
+  const toggleVisitRealizada = (visitId: string) => {
+    setVisits(prev => prev.map(v => {
+      if (v.id === visitId) {
+        const isRealizada = v.estado === 'Realizada';
+        const newState = isRealizada ? 'Marcada' : 'Realizada';
+        return {
+          ...v,
+          estado: newState,
+          realizadaEm: !isRealizada ? new Date().toISOString() : undefined
+        };
+      }
+      return v;
+    }));
+  };
+
   // PROPOSAL ACTIONS
-  const addProposal = (proposalData: Omit<Proposal, 'id' | 'nomeProprietario' | 'moradaConcelhoFreguesia' | 'margemPrevista' | 'spread'>): Proposal => {
+  const addProposal = (proposalData: Omit<Proposal, 'id' | 'nomeProprietario' | 'moradaConcelhoFreguesia' | 'margemPrevista' | 'spread' | 'multiploSinal' | 'assignedUser'> & { valorSinal?: number }): Proposal => {
     const lead = leads.find(l => l.id === proposalData.leadId);
     const id = 'prop-' + Date.now();
 
     const margemPrevista = calcProposalMargin(proposalData.valorRevenda, proposalData.valorProposta);
     const spread = calcProposalSpread(proposalData.valorRevenda, proposalData.valorProposta);
+    
+    const valorSinal = proposalData.valorSinal !== undefined && proposalData.valorSinal > 0
+      ? proposalData.valorSinal
+      : calcDefaultSinal(proposalData.valorProposta);
+      
+    const multiploSinal = calcProposalMultiple(margemPrevista, valorSinal);
 
     const newProposal: Proposal = {
       ...proposalData,
       id,
       nomeProprietario: lead ? lead.nomeProprietario : 'N/A',
-      moradaConcelhoFreguesia: lead ? `${lead.moradaZona}, ${lead.concelho} (${lead.freguesia})` : 'N/A',
+      moradaConcelhoFreguesia: lead ? lead.freguesia : 'N/A',
+      valorSinal,
       margemPrevista,
-      spread
+      spread,
+      multiploSinal,
+      assignedUser: currentUser
     };
 
     setProposals(prev => [newProposal, ...prev]);
@@ -337,13 +567,17 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const lead = leads.find(l => l.id === updatedProposal.leadId);
     const margemPrevista = calcProposalMargin(updatedProposal.valorRevenda, updatedProposal.valorProposta);
     const spread = calcProposalSpread(updatedProposal.valorRevenda, updatedProposal.valorProposta);
+    const valorSinal = updatedProposal.valorSinal > 0 ? updatedProposal.valorSinal : calcDefaultSinal(updatedProposal.valorProposta);
+    const multiploSinal = calcProposalMultiple(margemPrevista, valorSinal);
 
     const finalProposal: Proposal = {
       ...updatedProposal,
       nomeProprietario: lead ? lead.nomeProprietario : updatedProposal.nomeProprietario,
-      moradaConcelhoFreguesia: lead ? `${lead.moradaZona}, ${lead.concelho} (${lead.freguesia})` : updatedProposal.moradaConcelhoFreguesia,
+      moradaConcelhoFreguesia: lead ? lead.freguesia : updatedProposal.moradaConcelhoFreguesia,
+      valorSinal,
       margemPrevista,
-      spread
+      spread,
+      multiploSinal
     };
 
     setProposals(prev => prev.map(p => p.id === finalProposal.id ? finalProposal : p));
@@ -361,32 +595,140 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (prop.leadId) {
       updateLeadPhase(prop.leadId, 'CPCV a preparar');
-      addNoteToLead(prop.leadId, `Proposta de ${prop.valorProposta} € aceite! Fase atualizada para CPCV a preparar.`, 'Sistema Propostas');
+      addNoteToLead(prop.leadId, `Proposta de ${prop.valorProposta} € aceite! Negócio encaminhado para formalização de CPCV.`);
+      
+      // Auto-create post-acceptance Deal Operation if not already created
+      const existingOp = operations.find(o => o.proposalId === proposalId || o.leadId === prop.leadId);
+      if (!existingOp) {
+        const lead = leads.find(l => l.id === prop.leadId);
+        const newOp: DealOperation = {
+          id: 'op-' + Date.now(),
+          leadId: prop.leadId,
+          proposalId: prop.id,
+          nomeProprietario: prop.nomeProprietario,
+          freguesia: lead ? lead.freguesia : 'Aveiro',
+          tipoImovel: lead ? lead.tipoImovel : 'Moradia',
+          areaM2: lead?.areaM2,
+          valorCompraAcordado: prop.valorProposta,
+          valorSinalPago: prop.valorSinal,
+          valorRevendaAlvo: prop.valorRevenda,
+          margemPrevista: prop.margemPrevista,
+          multiploSinal: prop.multiploSinal,
+          fase: 'Validacao_Facebook',
+          responsavel: currentUser,
+          dataAceitacao: new Date().toISOString().split('T')[0],
+          checklist: {
+            anuncioCriadoFacebook: true,
+            leadsInteresseRecebidas: false,
+            compradorIdentificado: false,
+            sinalPago10: false
+          },
+          historicoNotas: [
+            {
+              id: 'on-' + Date.now(),
+              author: currentUser,
+              text: `Proposta de ${prop.valorProposta} € aceite por ${currentUser}. Negócio colocado em validação de interesse no Facebook.`,
+              date: new Date().toISOString()
+            }
+          ],
+          notas: `Proposta aceite em ${new Date().toISOString().split('T')[0]}. Teste de interesse no Facebook em curso.`
+        };
+        setOperations(prev => [newOp, ...prev]);
+      }
     }
   };
 
-  const resetToDemoData = () => {
-    setLeads(INITIAL_LEADS);
-    setVisits(INITIAL_VISITS);
-    setProposals(INITIAL_PROPOSALS);
-    localStorage.removeItem('wt_crm_leads');
-    localStorage.removeItem('wt_crm_visits');
-    localStorage.removeItem('wt_crm_proposals');
-    localStorage.removeItem('wt_crm_call_drafts');
+  // OPERATIONS ACTIONS (Pós-Aceitação / Do CPCV até à Venda)
+  const addOperation = (opData: Omit<DealOperation, 'id'>): DealOperation => {
+    const id = 'op-' + Date.now();
+    const newOp: DealOperation = {
+      ...opData,
+      id
+    };
+    setOperations(prev => [newOp, ...prev]);
+    return newOp;
+  };
+
+  const updateOperation = (updatedOp: DealOperation) => {
+    setOperations(prev => prev.map(o => o.id === updatedOp.id ? updatedOp : o));
+  };
+
+  const updateOperationStage = (opId: string, stage: OperationStage) => {
+    setOperations(prev => prev.map(o => {
+      if (o.id === opId) {
+        const updates: Partial<DealOperation> = { fase: stage };
+        if (stage === 'CPCV_Assinado' && !o.dataAssinaturaCPCV) {
+          updates.dataAssinaturaCPCV = new Date().toISOString().split('T')[0];
+        }
+        if (stage === 'Venda_Fechada' && !o.dataVendaFechada) {
+          updates.dataVendaFechada = new Date().toISOString().split('T')[0];
+          updates.lucroRealizado = o.valorVendaRealizado ? (o.valorVendaRealizado - o.valorCompraAcordado) : o.margemPrevista;
+        }
+        return { ...o, ...updates };
+      }
+      return o;
+    }));
+  };
+
+  const toggleChecklistDoc = (opId: string, docKey: keyof DocumentChecklist) => {
+    setOperations(prev => prev.map(o => {
+      if (o.id === opId) {
+        return {
+          ...o,
+          checklist: {
+            ...o.checklist,
+            [docKey]: !o.checklist[docKey]
+          }
+        };
+      }
+      return o;
+    }));
+  };
+
+  const deleteOperation = (opId: string) => {
+    setOperations(prev => prev.filter(o => o.id !== opId));
+  };
+
+  const addOperationNote = (opId: string, text: string) => {
+    if (!text.trim()) return;
+    const newNote: OperationNote = {
+      id: 'on-' + Date.now(),
+      author: currentUser,
+      text: text.trim(),
+      date: new Date().toISOString()
+    };
+    setOperations(prev => prev.map(o => {
+      if (o.id === opId) {
+        return {
+          ...o,
+          historicoNotas: [newNote, ...(o.historicoNotas || [])]
+        };
+      }
+      return o;
+    }));
   };
 
   return (
     <CRMContext.Provider
       value={{
-        leads,
-        visits,
-        proposals,
+        isAuthenticated,
+        currentUser,
+        setCurrentUser,
+        login,
+        logout,
+
         activeTab,
         setActiveTab,
         leadViewMode,
         setLeadViewMode,
         globalSearch,
         setGlobalSearch,
+
+        leads,
+        visits,
+        proposals,
+        notes,
+        operations,
 
         selectedLeadForDrawer,
         setSelectedLeadForDrawer,
@@ -415,6 +757,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         editingProposal,
         setEditingProposal,
 
+        isAIModalOpen,
+        setIsAIModalOpen,
+        aiTargetLead,
+        setAITargetLead,
+        openAIAnalysis,
+
         deleteImpactModal,
         setDeleteImpactModal,
 
@@ -426,16 +774,27 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addNoteToLead,
         addCallNoteToLead,
 
+        addNote,
+        updateNote,
+        deleteNote,
+        togglePinNote,
+
         addVisit,
         updateVisit,
         deleteVisit,
+        toggleVisitRealizada,
 
         addProposal,
         updateProposal,
         deleteProposal,
         acceptProposal,
 
-        resetToDemoData
+        addOperation,
+        updateOperation,
+        updateOperationStage,
+        toggleChecklistDoc,
+        deleteOperation,
+        addOperationNote
       }}
     >
       {children}
