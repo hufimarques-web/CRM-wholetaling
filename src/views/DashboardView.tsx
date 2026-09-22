@@ -25,10 +25,14 @@ export const DashboardView: React.FC = () => {
 
   const [dashboardNoteText, setDashboardNoteText] = useState('');
 
+  // Active Leads (Descartadas desaparecem da página principal)
+  const activeLeads = leads.filter(l => l.fase !== 'Descartada');
+  const discardedLeadsCount = leads.filter(l => l.fase === 'Descartada').length;
+
   // Primary Metrics
-  const totalLeads = leads.length;
-  const porContactar = leads.filter(l => l.contacto === 'Não contactado').length;
-  const totalMargem = leads.reduce((acc, curr) => acc + (curr.margemPotencial || 0), 0);
+  const totalLeads = activeLeads.length;
+  const porContactar = activeLeads.filter(l => l.contacto === 'Não contactado').length;
+  const totalMargem = activeLeads.reduce((acc, curr) => acc + (curr.margemPotencial || 0), 0);
   const propostasAceites = proposals.filter(p => p.estado === 'Aceite').length;
   const totalSinais = proposals.reduce((acc, curr) => acc + (curr.valorSinal || 0), 0);
   const operacoesAtivas = operations.filter(o => o.fase !== 'Venda_Fechada' && o.fase !== 'Cancelado').length;
@@ -36,8 +40,8 @@ export const DashboardView: React.FC = () => {
     .filter(o => o.fase === 'Venda_Fechada')
     .reduce((acc, curr) => acc + (curr.lucroRealizado || 0), 0);
 
-  // Top Deals by Potential Margin (Sem benchmarks artificiais)
-  const topMarginDeals = [...leads]
+  // Top Deals by Potential Margin (Apenas leads ativas)
+  const topMarginDeals = [...activeLeads]
     .sort((a, b) => (b.margemPotencial || 0) - (a.margemPotencial || 0))
     .slice(0, 4);
 
@@ -158,6 +162,19 @@ export const DashboardView: React.FC = () => {
             Deals concluídos
           </span>
         </div>
+
+        {discardedLeadsCount > 0 && (
+          <div
+            onClick={() => setActiveTab('discarded')}
+            className="bg-[#1A1B20] text-stone-300 p-4 border border-stone-800 shadow-2xs cursor-pointer hover:border-amber-500 transition"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 block">Leads Descartadas</span>
+            <span className="text-2xl font-black text-white mt-1 block">{discardedLeadsCount}</span>
+            <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-800 text-stone-300 hover:text-white">
+              Ver aba Descartadas &rarr;
+            </span>
+          </div>
+        )}
       </div>
 
       {/* REQUIREMENT 5: PRIMARY NOTES BOARD IN THE DASHBOARD */}

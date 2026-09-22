@@ -22,16 +22,21 @@ export const LeadsView: React.FC = () => {
   const [contactoFilter, setContactoFilter] = useState<ContactStatus | 'Todos'>('Todos');
   const [freguesiaFilter, setFreguesiaFilter] = useState<string>('Todas');
 
-  // Unique freguesias for filter dropdown
+  // Unique freguesias for filter dropdown (only active leads)
   const uniqueFreguesias = useMemo(() => {
     const set = new Set<string>();
-    leads.forEach(l => { if (l.freguesia) set.add(l.freguesia); });
+    leads.filter(l => l.fase !== 'Descartada').forEach(l => { if (l.freguesia) set.add(l.freguesia); });
     return Array.from(set);
   }, [leads]);
 
-  // Filtered Leads logic
+  // Filtered Leads logic (Excluded discarded leads from main pipeline by default)
   const filteredLeads = useMemo(() => {
     return leads.filter(l => {
+      // Discarded leads disappear from main page and live in the 'Descartadas' tab
+      if (faseFilter !== 'Descartada' && l.fase === 'Descartada') {
+        return false;
+      }
+
       // Global Search
       if (globalSearch.trim()) {
         const query = globalSearch.toLowerCase().trim();

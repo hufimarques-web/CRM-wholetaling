@@ -8,6 +8,7 @@ import {
   Building2,
   X,
   ShieldCheck,
+  Archive,
   LogOut
 } from 'lucide-react';
 import { useCRM } from '../../context/CRMContext';
@@ -44,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       id: 'leads',
       label: 'Leads & Funil',
       icon: Columns,
-      badge: leads.length
+      badge: leads.filter(l => l.fase !== 'Descartada').length
     },
     {
       id: 'notes',
@@ -70,9 +71,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       icon: ShieldCheck,
       badge: operations.filter(o => o.fase !== 'Venda_Fechada' && o.fase !== 'Cancelado').length
     },
+    {
+      id: 'discarded',
+      label: 'Descartadas',
+      icon: Archive,
+      badge: leads.filter(l => l.fase === 'Descartada').length
+    },
   ] as const;
 
-  const handleNavClick = (id: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations') => {
+  const handleNavClick = (id: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded') => {
     setActiveTab(id);
     setMobileOpen(false);
   };

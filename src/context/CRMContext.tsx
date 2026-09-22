@@ -27,8 +27,8 @@ interface CRMContextType {
   logout: () => void;
 
   // Navigation & Search
-  activeTab: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations';
-  setActiveTab: (tab: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations') => void;
+  activeTab: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded';
+  setActiveTab: (tab: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded') => void;
   leadViewMode: 'funnel' | 'table';
   setLeadViewMode: (mode: 'funnel' | 'table') => void;
   globalSearch: string;
@@ -89,6 +89,8 @@ interface CRMContextType {
   requestDeleteLead: (leadId: string) => void;
   confirmDeleteLead: (leadId: string) => void;
   updateLeadPhase: (leadId: string, newPhase: LeadPhase) => void;
+  discardLead: (leadId: string, reason?: string) => void;
+  restoreLead: (leadId: string, targetPhase?: LeadPhase) => void;
   addNoteToLead: (leadId: string, text: string) => void;
   addCallNoteToLead: (params: AddCallNoteParams) => void;
 
@@ -162,7 +164,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Navigation & Search
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded'>('dashboard');
   const [leadViewMode, setLeadViewMode] = useState<'funnel' | 'table'>('funnel');
   const [globalSearch, setGlobalSearch] = useState('');
 
@@ -170,7 +172,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [leads, setLeads] = useState<Lead[]>(() => {
     const saved = getSafeLocalStorage('wt_crm_leads');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) { console.error(e); }
     }
     return INITIAL_LEADS;
   });
@@ -194,7 +199,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notes, setNotes] = useState<Note[]>(() => {
     const saved = getSafeLocalStorage('wt_crm_notes');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) { console.error(e); }
     }
     return INITIAL_NOTES;
   });
@@ -235,12 +243,26 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetch('/api/bootstrap')
       .then(res => res.json())
       .then(data => {
-        if (data && data.leads) {
+        if (data && Array.isArray(data.leads) && data.leads.length > 0) {
           setLeads(data.leads);
-          setVisits(data.visits);
-          setProposals(data.proposals);
-          setNotes(data.notes);
-          setOperations(data.operations);
+        } else if (INITIAL_LEADS.length > 0) {
+          const saved = getSafeLocalStorage('wt_crm_leads');
+          if (!saved || saved === '[]') {
+            setLeads(INITIAL_LEADS);
+          }
+        }
+        if (data) {
+          if (Array.isArray(data.visits)) setVisits(data.visits);
+          if (Array.isArray(data.proposals)) setProposals(data.proposals);
+          if (Array.isArray(data.notes) && data.notes.length > 0) {
+            setNotes(data.notes);
+          } else if (INITIAL_NOTES.length > 0) {
+            const savedNotes = getSafeLocalStorage('wt_crm_notes');
+            if (!savedNotes || savedNotes === '[]') {
+              setNotes(INITIAL_NOTES);
+            }
+          }
+          if (Array.isArray(data.operations)) setOperations(data.operations);
         }
       })
       .catch(err => console.warn('Prisma bootstrap loaded offline/local fallback:', err));
@@ -331,6 +353,22 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateLeadPhase = (leadId: string, newPhase: LeadPhase) => {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, fase: newPhase } : l));
+    fetch(`/api/leads/${leadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fase: newPhase })
+    }).catch(err => console.warn('Prisma phase sync error:', err));
+  };
+
+  const discardLead = (leadId: string, reason?: string) => {
+    if (reason && reason.trim()) {
+      addNoteToLead(leadId, `Motivo de Descarte: ${reason.trim()}`);
+    }
+    updateLeadPhase(leadId, 'Descartada');
+  };
+
+  const restoreLead = (leadId: string, targetPhase: LeadPhase = 'Nova lead') => {
+    updateLeadPhase(leadId, targetPhase);
   };
 
   const addNoteToLead = (leadId: string, text: string) => {
@@ -771,6 +809,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         requestDeleteLead,
         confirmDeleteLead,
         updateLeadPhase,
+        discardLead,
+        restoreLead,
         addNoteToLead,
         addCallNoteToLead,
 

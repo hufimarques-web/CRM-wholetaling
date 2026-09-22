@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { PhoneCall, Edit, Trash2, Calendar, MapPin, Sparkles, Building, ChevronLeft, ChevronRight, ArrowRightLeft } from 'lucide-react';
+import { PhoneCall, Edit, Trash2, Calendar, MapPin, Sparkles, Building, ChevronLeft, ChevronRight, ArrowRightLeft, Archive } from 'lucide-react';
 import { useCRM } from '../../context/CRMContext';
 import { Lead, LeadPhase } from '../../types/crm';
 import { formatCurrency, getContactStatusBadge, getUserTheme } from '../../utils/formatters';
@@ -8,8 +8,7 @@ const FUNNEL_PHASES: { id: LeadPhase; label: string }[] = [
   { id: 'Nova lead', label: 'NOVA LEAD' },
   { id: 'Em análise', label: 'EM ANÁLISE' },
   { id: 'Pronta para proposta', label: 'PRONTA P/ PROPOSTA' },
-  { id: 'CPCV a preparar', label: 'CPCV A PREPARAR' },
-  { id: 'Descartada', label: 'DESCARTADA' }
+  { id: 'CPCV a preparar', label: 'CPCV A PREPARAR' }
 ];
 
 interface FunnelBoardProps {
@@ -19,6 +18,7 @@ interface FunnelBoardProps {
 export const FunnelBoard: React.FC<FunnelBoardProps> = ({ filteredLeads }) => {
   const {
     updateLeadPhase,
+    discardLead,
     setSelectedLeadForDrawer,
     setEditingLead,
     setIsLeadFormOpen,
@@ -33,6 +33,7 @@ export const FunnelBoard: React.FC<FunnelBoardProps> = ({ filteredLeads }) => {
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<LeadPhase | null>(null);
   const [wasCardDragged, setWasCardDragged] = useState(false);
+  const [isOverDiscardZone, setIsOverDiscardZone] = useState(false);
 
   // Horizontal Drag-to-Scroll State
   const boardContainerRef = useRef<HTMLDivElement>(null);
@@ -137,6 +138,34 @@ export const FunnelBoard: React.FC<FunnelBoardProps> = ({ filteredLeads }) => {
         </div>
       </div>
 
+      {/* Zona de Descarte Rápido / Drop Zone */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (!isOverDiscardZone) setIsOverDiscardZone(true);
+        }}
+        onDragLeave={() => setIsOverDiscardZone(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsOverDiscardZone(false);
+          const leadId = e.dataTransfer.getData('text/plain') || draggedLeadId;
+          if (leadId) {
+            discardLead(leadId);
+          }
+          setDraggedLeadId(null);
+          setTimeout(() => setWasCardDragged(false), 150);
+        }}
+        className={`p-3 rounded-xl border-2 border-dashed transition-all flex items-center justify-center gap-2 text-xs font-bold shrink-0 ${
+          isOverDiscardZone
+            ? 'border-rose-500 bg-rose-100 text-rose-800 scale-[1.005] shadow-sm'
+            : 'border-stone-300 hover:border-rose-300 bg-stone-50/70 hover:bg-rose-50/40 text-stone-500 hover:text-rose-700'
+        }`}
+      >
+        <Archive className="w-4 h-4 text-rose-500 shrink-0" />
+        <span>Zona de Descarte: Arraste qualquer lead para aqui para descartar (sai do funil e vai para a aba Descartadas)</span>
+      </div>
+
       {/* Main Drag-to-Scroll Horizontal Container */}
       <div
         ref={boardContainerRef}
@@ -148,7 +177,7 @@ export const FunnelBoard: React.FC<FunnelBoardProps> = ({ filteredLeads }) => {
           isMouseDown ? 'cursor-grabbing' : ''
         }`}
       >
-        <div className="grid grid-cols-5 gap-4 min-w-[1250px] h-full items-start">
+        <div className="grid grid-cols-4 gap-4 min-w-[1050px] h-full items-start">
           
           {FUNNEL_PHASES.map(phase => {
             const colLeads = filteredLeads.filter(l => l.fase === phase.id);
@@ -307,7 +336,7 @@ export const FunnelBoard: React.FC<FunnelBoardProps> = ({ filteredLeads }) => {
                                 <Calendar className="w-3.5 h-3.5" />
                               </button>
 
-                              <button
+                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEditingLead(lead);
@@ -317,6 +346,19 @@ export const FunnelBoard: React.FC<FunnelBoardProps> = ({ filteredLeads }) => {
                                 title="Editar Lead (100% editável)"
                               >
                                 <Edit className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm(`Descartar a lead "${lead.nomeProprietario}"? Ela desaparecerá do funil e irá para a aba Descartadas.`)) {
+                                    discardLead(lead.id);
+                                  }
+                                }}
+                                className="p-1 rounded-md text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                                title="Descartar Lead (Mover para Aba Descartadas)"
+                              >
+                                <Archive className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>

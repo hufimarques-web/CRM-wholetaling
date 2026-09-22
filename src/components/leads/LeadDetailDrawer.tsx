@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
   X, Phone, PhoneCall, MapPin, Calendar, FileText, Plus, Edit, Trash2,
-  CheckCircle2, AlertCircle, Calculator, Building, Tag, Send, Clock, Sparkles, User, Check, ArrowRight, ShieldCheck
+  CheckCircle2, AlertCircle, Calculator, Building, Tag, Send, Clock, Sparkles, User, Check, ArrowRight, ShieldCheck,
+  Archive, RotateCcw
 } from 'lucide-react';
 import { useCRM } from '../../context/CRMContext';
 import { formatCurrency, formatDatePT, checkLeadReadiness, getContactStatusBadge, getPhotoStatusBadge, getPhaseBadge, getPriorityBadge, getVisitStateBadge, getProposalStateBadge, getUserTheme } from '../../utils/formatters';
@@ -17,6 +18,9 @@ export const LeadDetailDrawer: React.FC = () => {
     setPreselectedProposalLeadId,
     setIsProposalFormOpen,
     requestDeleteLead,
+    updateLeadPhase,
+    discardLead,
+    restoreLead,
     addNoteToLead,
     openCallModal,
     openAIAnalysis,
@@ -153,14 +157,44 @@ export const LeadDetailDrawer: React.FC = () => {
             )}
           </div>
 
-          <button
-            onClick={() => requestDeleteLead(lead.id)}
-            className="p-1 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-md transition text-xs flex items-center gap-1"
-            title="Eliminar Lead"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span className="text-[10px]">Eliminar</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {lead.fase === 'Descartada' ? (
+              <button
+                onClick={() => {
+                  restoreLead(lead.id, 'Nova lead');
+                  setSelectedLeadForDrawer(null);
+                }}
+                className="px-2.5 py-1 text-xs font-bold text-emerald-800 bg-emerald-100/80 hover:bg-emerald-200 rounded-md border border-emerald-300 transition flex items-center gap-1.5"
+                title="Reativar e colocar no funil ativo"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Reativar Lead</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Descartar a lead "${lead.nomeProprietario}" e mover para a aba Descartadas?`)) {
+                    discardLead(lead.id);
+                    setSelectedLeadForDrawer(null);
+                  }
+                }}
+                className="px-2 py-1 text-xs font-semibold text-stone-600 hover:text-rose-700 bg-stone-100 hover:bg-rose-50 rounded-md border border-stone-200 hover:border-rose-300 transition flex items-center gap-1"
+                title="Descartar esta lead (sai do funil ativo)"
+              >
+                <Archive className="w-3.5 h-3.5 text-rose-500" />
+                <span>Descartar Lead</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => requestDeleteLead(lead.id)}
+              className="p-1 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-md transition text-xs flex items-center gap-1"
+              title="Eliminar Lead permanentemente"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="text-[10px]">Eliminar</span>
+            </button>
+          </div>
         </div>
 
         {/* Quick Action Ribbon with AI Assistant */}

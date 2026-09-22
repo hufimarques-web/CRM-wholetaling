@@ -8,6 +8,7 @@ import { CalendarView } from './views/CalendarView';
 import { ProposalsView } from './views/ProposalsView';
 import { NotesView } from './views/NotesView';
 import { OperationsView } from './views/OperationsView';
+import { DiscardedView } from './views/DiscardedView';
 import { LoginView } from './views/LoginView';
 import { LeadFormModal } from './components/leads/LeadFormModal';
 import { LeadDetailDrawer } from './components/leads/LeadDetailDrawer';
@@ -49,6 +50,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'calendar' && <CalendarView />}
           {activeTab === 'proposals' && <ProposalsView />}
           {activeTab === 'operations' && <OperationsView />}
+          {activeTab === 'discarded' && <DiscardedView />}
         </main>
       </div>
 

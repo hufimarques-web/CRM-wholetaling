@@ -55,6 +55,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onOpenMobileSidebar }) => {
       case 'calendar': return 'Visitas Agendadas & Realizadas';
       case 'proposals': return 'Propostas & Múltiplos de Sinal';
       case 'operations': return 'Operações & CPCV (Pós-Aceitação)';
+      case 'discarded': return 'Leads Descartadas (Arquivo Histórico)';
     }
   };
 
