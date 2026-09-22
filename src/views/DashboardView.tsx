@@ -144,36 +144,40 @@ export const DashboardView: React.FC = () => {
       </div>
 
       {/* EXECUTIVE FINANCIAL HIGHLIGHT: CAPITAL INVESTIDO EM SINAIS CPCV & RETORNO FINAL */}
-      <div className="bg-[#141519] text-white rounded-2xl border border-stone-800 p-6 shadow-xl space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800 pb-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
-                Métricas Financeiras de Arbitragem
-              </span>
-              <span className="text-stone-500">•</span>
-              <span className="text-xs text-stone-400">
-                Sinais CPCV (10% padrão) vs. Margem de Revenda
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-2xs p-5 sm:p-6 space-y-4">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+              <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">
+                Métricas de Arbitragem Wholetailing
               </span>
             </div>
-            <h3 className="text-lg font-black text-white tracking-tight font-display">
+            <h3 className="text-base sm:text-lg font-black text-stone-900 tracking-tight font-display">
               Capital Investido em Sinais & Retorno Final Projetado
             </h3>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
             <button
               onClick={() => setShowDealsBreakdown(prev => !prev)}
-              className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white rounded-xl text-xs font-bold border border-stone-700 transition flex items-center gap-2"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+                showDealsBreakdown
+                  ? 'bg-stone-900 text-white border-stone-900'
+                  : 'bg-[#FAF8F5] hover:bg-stone-100 text-stone-700 border-stone-200'
+              }`}
             >
-              <span>{showDealsBreakdown ? 'Fechar Detalhe' : 'Ver Negócios em Carteira'}</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              <span>{showDealsBreakdown ? 'Ocultar Detalhes' : 'Ver Carteira'}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                showDealsBreakdown ? 'bg-stone-800 text-white' : 'bg-stone-200 text-stone-700'
+              }`}>
                 {activeProposalsWithCapital.length}
               </span>
             </button>
             <button
               onClick={() => setActiveTab('proposals')}
-              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+              className="px-3.5 py-1.5 bg-stone-900 hover:bg-black text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
             >
               <span>Todas as Propostas</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -181,65 +185,67 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
 
-        {/* 3 Executive Pillars: Capital Investido, Retorno Final em Valor, Retorno em % */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 3 Clean Pillars */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
           
-          {/* Pillar 1: Sinal CPCV a ser Pago (Capital Investido) */}
-          <div className="bg-[#191A20] p-4.5 rounded-xl border border-amber-500/30 relative overflow-hidden flex flex-col justify-between">
+          {/* Pillar 1: Sinal CPCV a ser Pago */}
+          <div className="bg-[#FAF8F5] rounded-xl p-4 sm:p-5 border border-stone-200 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-amber-400 mb-1">
-                <span>Sinal CPCV a ser Pago</span>
-                <span className="px-2 py-0.5 rounded text-[9px] bg-amber-500/20 border border-amber-500/30 text-amber-300">
-                  Capital Investido
-                </span>
-              </div>
-              <div className="text-3xl font-black text-white font-display tracking-tight mt-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+                Sinal CPCV a ser Pago (Capital)
+              </span>
+              <div className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight mt-1 font-display">
                 {formatCurrency(totalSinalCapitalInvestido)}
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-stone-800/80 text-[11px] text-stone-400 flex items-center justify-between">
-              <span>{activeProposalsWithCapital.length} proposta(s) ativas com sinal</span>
-              <span className="text-amber-400 font-bold">10% compra</span>
+            <div className="mt-3.5 pt-2.5 border-t border-stone-200/70 text-xs text-stone-500 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                <span className="text-stone-700 font-semibold">{activeProposalsWithCapital.length} propostas com sinal</span>
+              </span>
+              <span className="text-amber-800 font-bold text-[11px] bg-amber-50 px-2 py-0.5 rounded border border-amber-200">10% sinal</span>
             </div>
           </div>
 
           {/* Pillar 2: Retorno em Valor Final */}
-          <div className="bg-[#191A20] p-4.5 rounded-xl border border-emerald-500/30 relative overflow-hidden flex flex-col justify-between">
+          <div className="bg-[#FAF8F5] rounded-xl p-4 sm:p-5 border border-stone-200 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-emerald-400 mb-1">
-                <span>Retorno em Valor Final</span>
-                <span className="px-2 py-0.5 rounded text-[9px] bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
-                  Lucro Projetado
-                </span>
-              </div>
-              <div className="text-3xl font-black text-emerald-400 font-display tracking-tight mt-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+                Retorno em Valor Final (+€)
+              </span>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight mt-1 font-display">
                 +{formatCurrency(totalRetornoFinalValor)}
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-stone-800/80 text-[11px] text-stone-400 flex items-center justify-between">
-              <span>Soma de spreads de revenda</span>
-              <span className="text-emerald-400 font-bold">Margem líquida</span>
+            <div className="mt-3.5 pt-2.5 border-t border-stone-200/70 text-xs text-stone-500 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span className="text-stone-700 font-semibold">Lucro líquido previsto</span>
+              </span>
+              <span className="text-emerald-800 font-bold text-[11px] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Spread revenda</span>
             </div>
           </div>
 
-          {/* Pillar 3: Retorno em % (ROI) + Múltiplo */}
-          <div className="bg-[#191A20] p-4.5 rounded-xl border border-stone-700 relative overflow-hidden flex flex-col justify-between">
+          {/* Pillar 3: Rentabilidade & Múltiplo */}
+          <div className="bg-[#FAF8F5] rounded-xl p-4 sm:p-5 border border-stone-200 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-stone-300 mb-1">
-                <span>Rentabilidade do Capital</span>
-                <span className="px-2 py-0.5 rounded text-[9px] bg-white/10 text-white font-black">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+                  Rentabilidade do Capital
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-stone-900 text-white">
                   {multiploCapital}x Múltiplo
                 </span>
               </div>
-              <div className="text-3xl font-black text-emerald-400 font-display tracking-tight mt-1">
-                +{totalRetornoPercent}% <span className="text-base text-stone-400 font-medium">ROI s/ Sinal</span>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight mt-1 font-display">
+                +{totalRetornoPercent}% <span className="text-xs font-bold text-stone-400">ROI s/ Sinal</span>
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-stone-800/80 text-[11px] text-stone-400">
+            <div className="mt-3.5 pt-2.5 border-t border-stone-200/70 text-xs text-stone-500 truncate">
               {totalSinalCapitalInvestido > 0 ? (
-                <span>Para cada 1.000 € investidos &rarr; retorno de <strong className="text-white font-bold">{formatCurrency(Math.round(1000 * (1 + totalRetornoFinalValor / totalSinalCapitalInvestido)))}</strong></span>
+                <span>1.000 € investidos &rarr; retorno de <strong className="text-stone-900 font-bold">{formatCurrency(Math.round(1000 * (1 + totalRetornoFinalValor / totalSinalCapitalInvestido)))}</strong></span>
               ) : (
-                <span>Registe propostas com sinal para aferir o rácio</span>
+                <span className="text-stone-400 italic">Sem propostas ativas no momento</span>
               )}
             </div>
           </div>
@@ -248,14 +254,16 @@ export const DashboardView: React.FC = () => {
 
         {/* Detailed Breakdown List by Proposal */}
         {showDealsBreakdown && (
-          <div className="bg-[#111215] rounded-xl border border-stone-800 p-4 space-y-3">
-            <div className="flex items-center justify-between text-xs font-bold text-stone-300">
-              <span>Negócios Contribuintes para o Capital & Retorno</span>
+          <div className="mt-4 pt-4 border-t border-stone-100 space-y-2.5">
+            <div className="flex items-center justify-between text-xs text-stone-500">
+              <span className="font-bold text-stone-800">Negócios em Carteira ({activeProposalsWithCapital.length})</span>
               <span className="text-[11px] text-stone-400">Clique para ver ou editar proposta</span>
             </div>
 
             {activeProposalsWithCapital.length === 0 ? (
-              <p className="text-stone-500 text-xs py-3 text-center">Nenhuma proposta ativa em carteira.</p>
+              <p className="text-stone-400 text-xs py-4 text-center bg-[#FAF8F5] rounded-xl border border-stone-200">
+                Nenhuma proposta ativa em carteira.
+              </p>
             ) : (
               <div className="space-y-2">
                 {activeProposalsWithCapital.map(p => {
@@ -263,41 +271,41 @@ export const DashboardView: React.FC = () => {
                   return (
                     <div
                       key={p.id}
-                      className="p-3 bg-[#191A20] hover:bg-[#202229] rounded-xl border border-stone-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition"
+                      className="p-3.5 bg-[#FAF8F5] hover:bg-[#F5F2EB] rounded-xl border border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition"
                     >
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-white text-sm">{p.nomeProprietario}</span>
-                          <span className="px-2 py-0.2 rounded text-[9px] font-bold bg-stone-800 text-stone-300 border border-stone-700">
+                          <span className="font-bold text-stone-900 text-sm">{p.nomeProprietario}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-stone-700 border border-stone-300">
                             {p.estado}
                           </span>
                         </div>
-                        <p className="text-[11px] text-stone-400">{p.moradaConcelhoFreguesia}</p>
+                        <p className="text-[11px] text-stone-500">{p.moradaConcelhoFreguesia}</p>
                       </div>
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-right">
                         <div>
-                          <span className="text-[10px] text-stone-500 uppercase block font-semibold">Proposta</span>
-                          <span className="font-bold text-stone-200">{formatCurrency(p.valorProposta)}</span>
+                          <span className="text-[10px] text-stone-400 uppercase block font-semibold">Proposta</span>
+                          <span className="font-bold text-stone-900">{formatCurrency(p.valorProposta)}</span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-amber-400 uppercase block font-bold">Sinal a Pagar</span>
-                          <span className="font-black text-amber-300">{formatCurrency(p.valorSinal)}</span>
+                          <span className="text-[10px] text-stone-400 uppercase block font-semibold">Sinal (10%)</span>
+                          <span className="font-bold text-amber-800">{formatCurrency(p.valorSinal)}</span>
                         </div>
                         <div>
-                          <span className="text-[10px] text-emerald-400 uppercase block font-bold">Retorno Final</span>
-                          <span className="font-black text-emerald-400">+{formatCurrency(p.margemPrevista)}</span>
+                          <span className="text-[10px] text-stone-400 uppercase block font-semibold">Retorno Final</span>
+                          <span className="font-bold text-emerald-700">+{formatCurrency(p.margemPrevista)}</span>
                         </div>
                         <div>
                           <span className="text-[10px] text-stone-400 uppercase block font-semibold">Rentabilidade</span>
-                          <span className="font-bold text-white">+{dealRoi}% ({p.multiploSinal || '-'}x)</span>
+                          <span className="font-black text-stone-800">+{dealRoi}% ({p.multiploSinal || '-'}x)</span>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={() => setViewingProposal(p)}
-                          className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white rounded-lg text-xs font-semibold border border-stone-700 transition"
+                          className="px-2.5 py-1.5 bg-white hover:bg-stone-100 text-stone-800 rounded-lg text-xs font-bold transition border border-stone-300"
                         >
                           Ver Proposta
                         </button>
@@ -306,7 +314,7 @@ export const DashboardView: React.FC = () => {
                             setEditingProposal(p);
                             setIsProposalFormOpen(true);
                           }}
-                          className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition"
+                          className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-2xs"
                         >
                           Editar
                         </button>
