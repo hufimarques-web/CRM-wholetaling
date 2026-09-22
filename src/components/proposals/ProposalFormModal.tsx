@@ -10,6 +10,10 @@ export const ProposalFormModal: React.FC = () => {
     setIsProposalFormOpen,
     editingProposal,
     setEditingProposal,
+    viewingProposal,
+    setViewingProposal,
+    prefilledProposalData,
+    setPrefilledProposalData,
     preselectedProposalLeadId,
     setPreselectedProposalLeadId,
     leads,
@@ -44,6 +48,19 @@ export const ProposalFormModal: React.FC = () => {
       setAssignedUser(editingProposal.assignedUser || currentUser);
       setProximoFollowUp(editingProposal.proximoFollowUp || '');
       setNotas(editingProposal.notas || '');
+    } else if (prefilledProposalData) {
+      const targetLeadId = prefilledProposalData.leadId || preselectedProposalLeadId || leads[0]?.id || '';
+      setLeadId(targetLeadId);
+      const propVal = prefilledProposalData.valorProposta || 100000;
+      setValorProposta(String(propVal));
+      setValorSinal(String(prefilledProposalData.valorSinal || calcDefaultSinal(propVal)));
+      setIsSinalManuallyEdited(true);
+      setValorRevenda(String(prefilledProposalData.valorRevenda || Math.round(propVal * 1.35)));
+      setDataEnvio(prefilledProposalData.dataEnvio || new Date().toISOString().split('T')[0]);
+      setEstado(prefilledProposalData.estado || 'Enviada');
+      setAssignedUser(currentUser);
+      setProximoFollowUp(prefilledProposalData.proximoFollowUp || '');
+      setNotas(prefilledProposalData.notas || '');
     } else {
       const selected = leads.find(l => l.id === preselectedProposalLeadId) || leads[0];
       setLeadId(selected?.id || '');
@@ -60,7 +77,7 @@ export const ProposalFormModal: React.FC = () => {
       setNotas('');
     }
     setError('');
-  }, [editingProposal, isProposalFormOpen, preselectedProposalLeadId, leads, currentUser]);
+  }, [editingProposal, prefilledProposalData, isProposalFormOpen, preselectedProposalLeadId, leads, currentUser]);
 
   if (!isProposalFormOpen) return null;
 
@@ -108,7 +125,7 @@ export const ProposalFormModal: React.FC = () => {
     }
 
     if (editingProposal) {
-      updateProposal({
+      const updated = {
         ...editingProposal,
         leadId,
         valorMinimoAbsoluto: selectedLead?.valorMinimoAbsoluto || 0,
@@ -120,11 +137,13 @@ export const ProposalFormModal: React.FC = () => {
         assignedUser,
         proximoFollowUp: proximoFollowUp || undefined,
         notas: notas.trim() || undefined
-      });
+      };
+      updateProposal(updated);
 
       if (estado === 'Aceite' && editingProposal.estado !== 'Aceite') {
         acceptProposal(editingProposal.id);
       }
+      setViewingProposal(updated);
     } else {
       const created = addProposal({
         leadId,
@@ -141,11 +160,20 @@ export const ProposalFormModal: React.FC = () => {
       if (estado === 'Aceite') {
         acceptProposal(created.id);
       }
+      setViewingProposal(created);
     }
 
     setIsProposalFormOpen(false);
     setEditingProposal(null);
     setPreselectedProposalLeadId(null);
+    setPrefilledProposalData(null);
+  };
+
+  const handleClose = () => {
+    setIsProposalFormOpen(false);
+    setEditingProposal(null);
+    setPreselectedProposalLeadId(null);
+    setPrefilledProposalData(null);
   };
 
   return (
@@ -166,14 +194,10 @@ export const ProposalFormModal: React.FC = () => {
             </div>
           </div>
           <button
-            onClick={() => {
-              setIsProposalFormOpen(false);
-              setEditingProposal(null);
-              setPreselectedProposalLeadId(null);
-            }}
-            className="text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition"
+            onClick={handleClose}
+            className="p-1 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -397,10 +421,7 @@ export const ProposalFormModal: React.FC = () => {
         <div className="bg-stone-100 px-6 py-3 border-t border-stone-200 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => {
-              setIsProposalFormOpen(false);
-              setEditingProposal(null);
-            }}
+            onClick={handleClose}
             className="px-4 py-2 text-stone-600 hover:text-stone-900 font-semibold text-xs"
           >
             Cancelar

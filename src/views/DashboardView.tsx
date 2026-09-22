@@ -20,21 +20,52 @@ export const DashboardView: React.FC = () => {
     setSelectedLeadForDrawer,
     setLeadViewMode,
     openAIAnalysis,
+    setViewingProposal,
+    setEditingProposal,
+    setIsProposalFormOpen,
     currentUser
   } = useCRM();
 
   const [dashboardNoteText, setDashboardNoteText] = useState('');
+  const [showDealsBreakdown, setShowDealsBreakdown] = useState(false);
 
   // Active Leads (Descartadas desaparecem da página principal)
   const activeLeads = leads.filter(l => l.fase !== 'Descartada');
   const discardedLeadsCount = leads.filter(l => l.fase === 'Descartada').length;
+
+  // Active Proposals with committed / to be paid capital
+  const activeProposalsWithCapital = proposals.filter(
+    p => p.estado === 'Enviada' || p.estado === 'Em negociação' || p.estado === 'Aceite'
+  );
+
+  // Sinal CPCV a ser pago de capital investido
+  const totalSinalCapitalInvestido = activeProposalsWithCapital.reduce(
+    (acc, curr) => acc + (curr.valorSinal || Math.round(curr.valorProposta * 0.1)),
+    0
+  );
+
+  // Retorno em valor final (Soma das margens previstas dos negócios)
+  const totalRetornoFinalValor = activeProposalsWithCapital.reduce(
+    (acc, curr) => acc + (curr.margemPrevista || (curr.valorRevenda - curr.valorProposta)),
+    0
+  );
+
+  // Retorno em % (ROI sobre capital investido em sinal)
+  const totalRetornoPercent = totalSinalCapitalInvestido > 0
+    ? Math.round((totalRetornoFinalValor / totalSinalCapitalInvestido) * 100)
+    : 0;
+
+  // Múltiplo do Sinal
+  const multiploCapital = totalSinalCapitalInvestido > 0
+    ? (totalRetornoFinalValor / totalSinalCapitalInvestido).toFixed(1)
+    : '0.0';
 
   // Primary Metrics
   const totalLeads = activeLeads.length;
   const porContactar = activeLeads.filter(l => l.contacto === 'Não contactado').length;
   const totalMargem = activeLeads.reduce((acc, curr) => acc + (curr.margemPotencial || 0), 0);
   const propostasAceites = proposals.filter(p => p.estado === 'Aceite').length;
-  const totalSinais = proposals.reduce((acc, curr) => acc + (curr.valorSinal || 0), 0);
+  const totalSinais = totalSinalCapitalInvestido;
   const operacoesAtivas = operations.filter(o => o.fase !== 'Venda_Fechada' && o.fase !== 'Cancelado').length;
   const totalLucroFechado = operations
     .filter(o => o.fase === 'Venda_Fechada')
@@ -112,6 +143,183 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
+      {/* EXECUTIVE FINANCIAL HIGHLIGHT: CAPITAL INVESTIDO EM SINAIS CPCV & RETORNO FINAL */}
+      <div className="bg-[#141519] text-white rounded-2xl border border-stone-800 p-6 shadow-xl space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800 pb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
+                Métricas Financeiras de Arbitragem
+              </span>
+              <span className="text-stone-500">•</span>
+              <span className="text-xs text-stone-400">
+                Sinais CPCV (10% padrão) vs. Margem de Revenda
+              </span>
+            </div>
+            <h3 className="text-lg font-black text-white tracking-tight font-display">
+              Capital Investido em Sinais & Retorno Final Projetado
+            </h3>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowDealsBreakdown(prev => !prev)}
+              className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white rounded-xl text-xs font-bold border border-stone-700 transition flex items-center gap-2"
+            >
+              <span>{showDealsBreakdown ? 'Fechar Detalhe' : 'Ver Negócios em Carteira'}</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                {activeProposalsWithCapital.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('proposals')}
+              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+            >
+              <span>Todas as Propostas</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* 3 Executive Pillars: Capital Investido, Retorno Final em Valor, Retorno em % */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          {/* Pillar 1: Sinal CPCV a ser Pago (Capital Investido) */}
+          <div className="bg-[#191A20] p-4.5 rounded-xl border border-amber-500/30 relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-amber-400 mb-1">
+                <span>Sinal CPCV a ser Pago</span>
+                <span className="px-2 py-0.5 rounded text-[9px] bg-amber-500/20 border border-amber-500/30 text-amber-300">
+                  Capital Investido
+                </span>
+              </div>
+              <div className="text-3xl font-black text-white font-display tracking-tight mt-1">
+                {formatCurrency(totalSinalCapitalInvestido)}
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-stone-800/80 text-[11px] text-stone-400 flex items-center justify-between">
+              <span>{activeProposalsWithCapital.length} proposta(s) ativas com sinal</span>
+              <span className="text-amber-400 font-bold">10% compra</span>
+            </div>
+          </div>
+
+          {/* Pillar 2: Retorno em Valor Final */}
+          <div className="bg-[#191A20] p-4.5 rounded-xl border border-emerald-500/30 relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-emerald-400 mb-1">
+                <span>Retorno em Valor Final</span>
+                <span className="px-2 py-0.5 rounded text-[9px] bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
+                  Lucro Projetado
+                </span>
+              </div>
+              <div className="text-3xl font-black text-emerald-400 font-display tracking-tight mt-1">
+                +{formatCurrency(totalRetornoFinalValor)}
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-stone-800/80 text-[11px] text-stone-400 flex items-center justify-between">
+              <span>Soma de spreads de revenda</span>
+              <span className="text-emerald-400 font-bold">Margem líquida</span>
+            </div>
+          </div>
+
+          {/* Pillar 3: Retorno em % (ROI) + Múltiplo */}
+          <div className="bg-[#191A20] p-4.5 rounded-xl border border-stone-700 relative overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-stone-300 mb-1">
+                <span>Rentabilidade do Capital</span>
+                <span className="px-2 py-0.5 rounded text-[9px] bg-white/10 text-white font-black">
+                  {multiploCapital}x Múltiplo
+                </span>
+              </div>
+              <div className="text-3xl font-black text-emerald-400 font-display tracking-tight mt-1">
+                +{totalRetornoPercent}% <span className="text-base text-stone-400 font-medium">ROI s/ Sinal</span>
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-stone-800/80 text-[11px] text-stone-400">
+              {totalSinalCapitalInvestido > 0 ? (
+                <span>Para cada 1.000 € investidos &rarr; retorno de <strong className="text-white font-bold">{formatCurrency(Math.round(1000 * (1 + totalRetornoFinalValor / totalSinalCapitalInvestido)))}</strong></span>
+              ) : (
+                <span>Registe propostas com sinal para aferir o rácio</span>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Detailed Breakdown List by Proposal */}
+        {showDealsBreakdown && (
+          <div className="bg-[#111215] rounded-xl border border-stone-800 p-4 space-y-3">
+            <div className="flex items-center justify-between text-xs font-bold text-stone-300">
+              <span>Negócios Contribuintes para o Capital & Retorno</span>
+              <span className="text-[11px] text-stone-400">Clique para ver ou editar proposta</span>
+            </div>
+
+            {activeProposalsWithCapital.length === 0 ? (
+              <p className="text-stone-500 text-xs py-3 text-center">Nenhuma proposta ativa em carteira.</p>
+            ) : (
+              <div className="space-y-2">
+                {activeProposalsWithCapital.map(p => {
+                  const dealRoi = p.valorSinal > 0 ? Math.round((p.margemPrevista / p.valorSinal) * 100) : 0;
+                  return (
+                    <div
+                      key={p.id}
+                      className="p-3 bg-[#191A20] hover:bg-[#202229] rounded-xl border border-stone-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white text-sm">{p.nomeProprietario}</span>
+                          <span className="px-2 py-0.2 rounded text-[9px] font-bold bg-stone-800 text-stone-300 border border-stone-700">
+                            {p.estado}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-stone-400">{p.moradaConcelhoFreguesia}</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-right">
+                        <div>
+                          <span className="text-[10px] text-stone-500 uppercase block font-semibold">Proposta</span>
+                          <span className="font-bold text-stone-200">{formatCurrency(p.valorProposta)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-amber-400 uppercase block font-bold">Sinal a Pagar</span>
+                          <span className="font-black text-amber-300">{formatCurrency(p.valorSinal)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-emerald-400 uppercase block font-bold">Retorno Final</span>
+                          <span className="font-black text-emerald-400">+{formatCurrency(p.margemPrevista)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-stone-400 uppercase block font-semibold">Rentabilidade</span>
+                          <span className="font-bold text-white">+{dealRoi}% ({p.multiploSinal || '-'}x)</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => setViewingProposal(p)}
+                          className="px-2.5 py-1 bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white rounded-lg text-xs font-semibold border border-stone-700 transition"
+                        >
+                          Ver Proposta
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingProposal(p);
+                            setIsProposalFormOpen(true);
+                          }}
+                          className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition"
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* 5 Clean Key Metrics with mixed sharp frame & rounded pills */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
         <div className="bg-white p-4 border border-stone-200 shadow-2xs">
@@ -131,10 +339,10 @@ export const DashboardView: React.FC = () => {
         </div>
 
         <div className="bg-white p-4 border border-stone-200 shadow-2xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">Sinais CPCV (10%)</span>
-          <span className="text-xl font-black text-amber-800 mt-1 block">{formatCurrency(totalSinais)}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">Sinais CPCV (Capital)</span>
+          <span className="text-xl font-black text-amber-900 mt-1 block">{formatCurrency(totalSinais)}</span>
           <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800">
-            Capital de sinal
+            Retorno: +{formatCurrency(totalRetornoFinalValor)} (+{totalRetornoPercent}%)
           </span>
         </div>
 

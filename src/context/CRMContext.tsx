@@ -71,6 +71,10 @@ interface CRMContextType {
   setPreselectedProposalLeadId: (leadId: string | null) => void;
   editingProposal: Proposal | null;
   setEditingProposal: (proposal: Proposal | null) => void;
+  viewingProposal: Proposal | null;
+  setViewingProposal: (proposal: Proposal | null) => void;
+  prefilledProposalData: Partial<Proposal> | null;
+  setPrefilledProposalData: (data: Partial<Proposal> | null) => void;
   
   // AI Deal Assistant Modal State
   isAIModalOpen: boolean;
@@ -231,6 +235,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isProposalFormOpen, setIsProposalFormOpen] = useState(false);
   const [preselectedProposalLeadId, setPreselectedProposalLeadId] = useState<string | null>(null);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
+  const [viewingProposal, setViewingProposal] = useState<Proposal | null>(null);
+  const [prefilledProposalData, setPrefilledProposalData] = useState<Partial<Proposal> | null>(null);
 
   // AI Deal Assistant
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
@@ -794,6 +800,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setPreselectedProposalLeadId,
         editingProposal,
         setEditingProposal,
+        viewingProposal,
+        setViewingProposal,
+        prefilledProposalData,
+        setPrefilledProposalData,
 
         isAIModalOpen,
         setIsAIModalOpen,

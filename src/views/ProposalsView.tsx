@@ -9,6 +9,7 @@ export const ProposalsView: React.FC = () => {
     proposals,
     setIsProposalFormOpen,
     setEditingProposal,
+    setViewingProposal,
     setPreselectedProposalLeadId,
     deleteProposal,
     acceptProposal,
@@ -239,14 +240,24 @@ export const ProposalsView: React.FC = () => {
 
                 {/* Proposal Actions */}
                 <div className="flex items-center justify-between pt-2 border-t border-stone-100">
-                  <button
-                    onClick={() => handleAcceptProposal(p.id)}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
-                    title="Aceitar Proposta e transitar para Operações & CPCV"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Aceite (Mover p/ Operações)</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setViewingProposal(p)}
+                      className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold transition flex items-center gap-1"
+                      title="Ver Proposta Completa"
+                    >
+                      <span>Ver Proposta</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleAcceptProposal(p.id)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-2xs"
+                      title="Aceitar Proposta e transitar para Operações & CPCV"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Aceite</span>
+                    </button>
+                  </div>
 
                   <div className="flex items-center space-x-1">
                     <button
@@ -255,7 +266,7 @@ export const ProposalsView: React.FC = () => {
                         setIsProposalFormOpen(true);
                       }}
                       className="p-1.5 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition"
-                      title="Editar Proposta"
+                      title="Editar Proposta (100% editável)"
                     >
                       <Edit className="w-4 h-4" />
                     </button>

@@ -15,6 +15,7 @@ import { LeadDetailDrawer } from './components/leads/LeadDetailDrawer';
 import { CallLogModal } from './components/leads/CallLogModal';
 import { VisitFormModal } from './components/visits/VisitFormModal';
 import { ProposalFormModal } from './components/proposals/ProposalFormModal';
+import { ProposalDetailModal } from './components/proposals/ProposalDetailModal';
 import { DeleteConfirmModal } from './components/common/DeleteConfirmModal';
 import { AIDealModal } from './components/common/AIDealModal';
 
@@ -60,6 +61,7 @@ const AppContent: React.FC = () => {
       <CallLogModal />
       <VisitFormModal />
       <ProposalFormModal />
+      <ProposalDetailModal />
       <AIDealModal />
       <DeleteConfirmModal />
 
