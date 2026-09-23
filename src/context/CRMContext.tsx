@@ -169,7 +169,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Navigation & Search
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded'>('leads');
   const [leadViewMode, setLeadViewMode] = useState<'funnel' | 'table'>('funnel');
   const [globalSearch, setGlobalSearch] = useState('');
 
@@ -243,8 +243,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setIsLoaded(true);
         }
       } catch (err) {
-        console.warn('Prisma initial sync warning:', err);
-        if (isMounted) setIsLoaded(true);
+        console.warn('Prisma initial sync warning, retrying in 1s:', err);
+        if (isMounted) {
+          setTimeout(initialSync, 1000);
+        }
       }
     };
 
