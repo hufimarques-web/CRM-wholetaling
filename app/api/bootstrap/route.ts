@@ -12,7 +12,7 @@ const NO_CACHE_HEADERS = {
 
 async function fetchFullBootstrapData() {
   const rawLeads = await prisma.lead.findMany({
-    include: { notas: true },
+    include: { notas: { orderBy: { createdAt: 'desc' } } },
     orderBy: { createdAt: 'desc' }
   });
 

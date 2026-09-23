@@ -86,6 +86,8 @@ export interface Lead {
   dataEntrada: string; // YYYY-MM-DD
   notas: Note[];
   isDemo?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type VisitState = 'Marcada' | 'Confirmada' | 'Realizada' | 'Cancelada' | 'Reagendar';

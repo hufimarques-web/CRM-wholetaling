@@ -35,6 +35,7 @@ interface CRMContextType {
   setGlobalSearch: (query: string) => void;
   
   // Data States
+  isLoaded: boolean;
   leads: Lead[];
   visits: Visit[];
   proposals: Proposal[];
@@ -172,52 +173,13 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [leadViewMode, setLeadViewMode] = useState<'funnel' | 'table'>('funnel');
   const [globalSearch, setGlobalSearch] = useState('');
 
-  // Main Data States with LocalStorage Initialization (SSR Safe)
-  const [leads, setLeads] = useState<Lead[]>(() => {
-    const saved = getSafeLocalStorage('wt_crm_leads');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) { console.error(e); }
-    }
-    return INITIAL_LEADS;
-  });
-
-  const [visits, setVisits] = useState<Visit[]>(() => {
-    const saved = getSafeLocalStorage('wt_crm_visits');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
-    }
-    return INITIAL_VISITS;
-  });
-
-  const [proposals, setProposals] = useState<Proposal[]>(() => {
-    const saved = getSafeLocalStorage('wt_crm_proposals');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
-    }
-    return INITIAL_PROPOSALS;
-  });
-
-  const [notes, setNotes] = useState<Note[]>(() => {
-    const saved = getSafeLocalStorage('wt_crm_notes');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) { console.error(e); }
-    }
-    return INITIAL_NOTES;
-  });
-
-  const [operations, setOperations] = useState<DealOperation[]>(() => {
-    const saved = getSafeLocalStorage('wt_crm_operations');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
-    }
-    return INITIAL_OPERATIONS;
-  });
+  // Database is Single Source of Truth
+  const [isLoaded, setIsLoaded] = useState<boolean>(false);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [operations, setOperations] = useState<DealOperation[]>([]);
 
   // Modal / Drawer Controls
   const [selectedLeadForDrawer, setSelectedLeadForDrawer] = useState<Lead | null>(null);
@@ -244,39 +206,45 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [deleteImpactModal, setDeleteImpactModal] = useState<LeadDeleteImpact | null>(null);
 
-  // Real-time synchronization & bootstrap with Prisma DB
+  // Real-time synchronization & bootstrap directly with Prisma DB
   useEffect(() => {
     let isMounted = true;
 
+    // Purge legacy local storage items to ensure every client is 100% database-driven
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('wt_crm_leads');
+        localStorage.removeItem('wt_crm_visits');
+        localStorage.removeItem('wt_crm_proposals');
+        localStorage.removeItem('wt_crm_notes');
+        localStorage.removeItem('wt_crm_operations');
+      } catch {}
+    }
+
     const initialSync = async () => {
       try {
-        const savedProposalsRaw = getSafeLocalStorage('wt_crm_proposals');
-        const savedLeadsRaw = getSafeLocalStorage('wt_crm_leads');
-        const savedProposals = savedProposalsRaw ? JSON.parse(savedProposalsRaw) : [];
-        const savedLeads = savedLeadsRaw ? JSON.parse(savedLeadsRaw) : [];
-
-        // Upload any proposals/leads that exist locally so the server DB has them
-        const res = await fetch('/api/bootstrap', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
-          body: JSON.stringify({
-            proposals: Array.isArray(savedProposals) ? savedProposals : [],
-            leads: Array.isArray(savedLeads) ? savedLeads : []
-          })
+        const res = await fetch(`/api/bootstrap?t=${Date.now()}`, {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma': 'no-cache'
+          }
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
         if (isMounted && data) {
-          if (Array.isArray(data.leads) && data.leads.length > 0) setLeads(data.leads);
+          if (Array.isArray(data.leads)) setLeads(data.leads);
           if (Array.isArray(data.visits)) setVisits(data.visits);
           if (Array.isArray(data.proposals)) setProposals(data.proposals);
           if (Array.isArray(data.notes)) setNotes(data.notes);
           if (Array.isArray(data.operations)) setOperations(data.operations);
+          setIsLoaded(true);
         }
       } catch (err) {
         console.warn('Prisma initial sync warning:', err);
+        if (isMounted) setIsLoaded(true);
       }
     };
 
@@ -286,14 +254,17 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const pollSync = async () => {
       try {
         const res = await fetch(`/api/bootstrap?t=${Date.now()}`, {
-          headers: { 'Cache-Control': 'no-cache' }
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma': 'no-cache'
+          }
         });
         if (!res.ok) return;
         const data = await res.json();
         if (!isMounted || !data) return;
 
         setLeads(prev => {
-          if (!Array.isArray(data.leads) || data.leads.length === 0) return prev;
+          if (!Array.isArray(data.leads)) return prev;
           const s = JSON.stringify(data.leads);
           return s !== JSON.stringify(prev) ? data.leads : prev;
         });
@@ -339,27 +310,6 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
-
-  // Sync with LocalStorage
-  useEffect(() => {
-    localStorage.setItem('wt_crm_leads', JSON.stringify(leads));
-  }, [leads]);
-
-  useEffect(() => {
-    localStorage.setItem('wt_crm_visits', JSON.stringify(visits));
-  }, [visits]);
-
-  useEffect(() => {
-    localStorage.setItem('wt_crm_proposals', JSON.stringify(proposals));
-  }, [proposals]);
-
-  useEffect(() => {
-    localStorage.setItem('wt_crm_notes', JSON.stringify(notes));
-  }, [notes]);
-
-  useEffect(() => {
-    localStorage.setItem('wt_crm_operations', JSON.stringify(operations));
-  }, [operations]);
 
   useEffect(() => {
     if (selectedLeadForDrawer) {
@@ -978,6 +928,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         globalSearch,
         setGlobalSearch,
 
+        isLoaded,
         leads,
         visits,
         proposals,

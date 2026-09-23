@@ -35,7 +35,14 @@ export const DiscardedView: React.FC = () => {
 
   // Filter only discarded leads
   const discardedLeads = useMemo(() => {
-    return leads.filter(l => l.fase === 'Descartada');
+    return leads
+      .filter(l => l.fase === 'Descartada')
+      .sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return a.id.localeCompare(b.id);
+      });
   }, [leads]);
 
   // Unique freguesias

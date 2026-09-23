@@ -61,6 +61,12 @@ export const LeadsView: React.FC = () => {
       if (freguesiaFilter !== 'Todas' && l.freguesia !== freguesiaFilter) return false;
 
       return true;
+    })
+    .sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (timeA !== timeB) return timeB - timeA;
+      return a.id.localeCompare(b.id);
     });
   }, [leads, globalSearch, userFilter, faseFilter, contactoFilter, freguesiaFilter]);
 
