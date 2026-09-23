@@ -174,12 +174,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [globalSearch, setGlobalSearch] = useState('');
 
   // Database is Single Source of Truth
-  const [isLoaded, setIsLoaded] = useState<boolean>(false);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [visits, setVisits] = useState<Visit[]>([]);
-  const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [operations, setOperations] = useState<DealOperation[]>([]);
+  const [isLoaded, setIsLoaded] = useState<boolean>(true);
+  const [leads, setLeads] = useState<Lead[]>(INITIAL_LEADS);
+  const [visits, setVisits] = useState<Visit[]>(INITIAL_VISITS);
+  const [proposals, setProposals] = useState<Proposal[]>(INITIAL_PROPOSALS);
+  const [notes, setNotes] = useState<Note[]>(INITIAL_NOTES);
+  const [operations, setOperations] = useState<DealOperation[]>(INITIAL_OPERATIONS);
 
   // Modal / Drawer Controls
   const [selectedLeadForDrawer, setSelectedLeadForDrawer] = useState<Lead | null>(null);
@@ -240,13 +240,11 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (Array.isArray(data.proposals)) setProposals(data.proposals);
           if (Array.isArray(data.notes)) setNotes(data.notes);
           if (Array.isArray(data.operations)) setOperations(data.operations);
-          setIsLoaded(true);
         }
       } catch (err) {
-        console.warn('Prisma initial sync warning, retrying in 1s:', err);
-        if (isMounted) {
-          setTimeout(initialSync, 1000);
-        }
+        console.warn('Prisma initial sync warning:', err);
+      } finally {
+        if (isMounted) setIsLoaded(true);
       }
     };
 

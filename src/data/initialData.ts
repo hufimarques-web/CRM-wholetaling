@@ -89,7 +89,7 @@ export const INITIAL_LEADS: Lead[] = [
     etiquetaMercado: '40/100 · B',
     contacto: 'Contactado',
     fotos: 'Fotos pedidas',
-    fase: 'Nova lead',
+    fase: 'CPCV a preparar',
     prioridade: 'Baixa',
     assignedTo: 'Hugo',
     dataEntrada: '2026-09-22',
@@ -179,6 +179,48 @@ export const INITIAL_LEADS: Lead[] = [
 ];
 
 export const INITIAL_VISITS: Visit[] = [];
-export const INITIAL_PROPOSALS: Proposal[] = [];
+export const INITIAL_PROPOSALS: Proposal[] = [
+  {
+    id: 'prop-1790125953822',
+    leadId: 'lead-conceicao-bilho',
+    nomeProprietario: 'Conceição Bilhó',
+    moradaConcelhoFreguesia: 'Esgueira',
+    valorMinimoAbsoluto: 70000,
+    valorProposta: 35000,
+    valorSinal: 3500,
+    valorRevenda: 88000,
+    margemPrevista: 53000,
+    spread: 60.2,
+    multiploSinal: 15.1,
+    dataEnvio: '2026-09-23',
+    estado: 'Aceite',
+    assignedUser: 'Queirós'
+  }
+];
 export const INITIAL_NOTES: Note[] = INITIAL_LEADS.flatMap(l => l.notas || []);
-export const INITIAL_OPERATIONS: DealOperation[] = [];
+export const INITIAL_OPERATIONS: DealOperation[] = [
+  {
+    id: 'op-1790125967662',
+    leadId: 'lead-conceicao-bilho',
+    proposalId: 'prop-1790125953822',
+    nomeProprietario: 'Conceição Bilhó',
+    freguesia: 'Esgueira',
+    tipoImovel: 'Ruína',
+    valorCompraAcordado: 35000,
+    valorSinalPago: 3500,
+    valorRevendaAlvo: 88000,
+    margemPrevista: 53000,
+    multiploSinal: 15.1,
+    fase: 'Validacao_Facebook',
+    responsavel: 'Queirós',
+    dataAceitacao: '2026-09-23',
+    checklist: {
+      anuncioCriadoFacebook: true,
+      leadsInteresseRecebidas: false,
+      compradorIdentificado: false,
+      sinalPago10: false
+    },
+    historicoNotas: [],
+    notas: 'Proposta aceite em 2026-09-23. Teste de interesse no Facebook em curso.'
+  }
+];

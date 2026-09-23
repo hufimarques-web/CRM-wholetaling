@@ -20,24 +20,12 @@ import { DeleteConfirmModal } from './components/common/DeleteConfirmModal';
 import { AIDealModal } from './components/common/AIDealModal';
 
 const AppContent: React.FC = () => {
-  const { activeTab, isAuthenticated, isLoaded } = useCRM();
+  const { activeTab, isAuthenticated } = useCRM();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Dedicated Architectural Login View if not authenticated
   if (!isAuthenticated) {
     return <LoginView />;
-  }
-
-  // Prevent flash of empty or uninitialized data while database bootstrap loads
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-[#F7F5F0] flex flex-col items-center justify-center font-sans text-stone-900">
-        <div className="w-12 h-12 rounded-xl bg-black border border-stone-800 flex items-center justify-center p-1.5 shadow-lg shadow-black/10 animate-pulse mb-3">
-          <img src="/logo.png" alt="Wholetailing" className="w-full h-full object-contain" />
-        </div>
-        <p className="text-xs uppercase tracking-widest text-stone-500 font-semibold animate-pulse">A sincronizar com a base de dados...</p>
-      </div>
-    );
   }
 
   return (
