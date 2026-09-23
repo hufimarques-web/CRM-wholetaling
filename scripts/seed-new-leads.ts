@@ -87,9 +87,64 @@ async function main() {
     }
   }
 
+  // Seed proposal
+  await prisma.proposal.upsert({
+    where: { id: 'prop-1790125953822' },
+    update: {},
+    create: {
+      id: 'prop-1790125953822',
+      leadId: 'lead-conceicao-bilho',
+      nomeProprietario: 'Conceição Bilhó',
+      moradaConcelhoFreguesia: 'Esgueira',
+      valorMinimoAbsoluto: 70000,
+      valorProposta: 35000,
+      valorSinal: 3500,
+      valorRevenda: 88000,
+      margemPrevista: 53000,
+      spread: 60.2,
+      multiploSinal: 15.1,
+      dataEnvio: '2026-09-23',
+      estado: 'Aceite',
+      assignedUser: 'Queirós'
+    }
+  });
+  console.log('Seeded proposal for Conceição Bilhó');
+
+  // Seed deal operation
+  await prisma.dealOperation.upsert({
+    where: { id: 'op-1790125967662' },
+    update: {},
+    create: {
+      id: 'op-1790125967662',
+      leadId: 'lead-conceicao-bilho',
+      proposalId: 'prop-1790125953822',
+      nomeProprietario: 'Conceição Bilhó',
+      freguesia: 'Esgueira',
+      tipoImovel: 'Ruína',
+      valorCompraAcordado: 35000,
+      valorSinalPago: 3500,
+      valorRevendaAlvo: 88000,
+      margemPrevista: 53000,
+      multiploSinal: 15.1,
+      fase: 'Validacao_Facebook',
+      responsavel: 'Queirós',
+      dataAceitacao: '2026-09-23',
+      checklistJson: JSON.stringify({
+        anuncioCriadoFacebook: true,
+        leadsInteresseRecebidas: false,
+        compradorIdentificado: false,
+        sinalPago10: false
+      }),
+      notas: 'Proposta aceite em 2026-09-23. Teste de interesse no Facebook em curso.'
+    }
+  });
+  console.log('Seeded deal operation for Conceição Bilhó');
+
   const totalLeads = await prisma.lead.count();
   const totalNotes = await prisma.note.count();
-  console.log(`Seeding complete! Database now has ${totalLeads} leads and ${totalNotes} notes.`);
+  const totalProposals = await prisma.proposal.count();
+  const totalOperations = await prisma.dealOperation.count();
+  console.log(`Seeding complete! Neon DB now has ${totalLeads} leads, ${totalNotes} notes, ${totalProposals} proposals, ${totalOperations} operations.`);
 }
 
 main()

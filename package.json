@@ -16,6 +16,8 @@
     "@fullcalendar/react": "6.1.15",
     "@fullcalendar/timegrid": "6.1.15",
     "@hello-pangea/dnd": "^17.0.0",
+    "@neon/config": "^1.7.3",
+    "@neon/env": "^1.4.4",
     "@prisma/client": "5.22.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
