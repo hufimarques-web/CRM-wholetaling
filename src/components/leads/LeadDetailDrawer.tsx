@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Phone, PhoneCall, MapPin, Calendar, FileText, Plus, Edit, Trash2,
-  CheckCircle2, AlertCircle, Calculator, Building, Tag, Send, Clock, Sparkles, User, Check, ArrowRight, ShieldCheck,
-  Archive, RotateCcw, Mail, TrendingUp, Percent, Save, RefreshCw, Sliders
+  CheckCircle2, AlertCircle, Building, Tag, Send, Clock, Sparkles, User, Check, ArrowRight, ShieldCheck,
+  Archive, RotateCcw, Mail, TrendingUp, Percent, Sliders
 } from 'lucide-react';
 import { useCRM } from '../../context/CRMContext';
 import { formatCurrency, formatDatePT, checkLeadReadiness, getContactStatusBadge, getPhotoStatusBadge, getPhaseBadge, getPriorityBadge, getVisitStateBadge, getProposalStateBadge, getUserTheme } from '../../utils/formatters';
@@ -40,42 +40,7 @@ export const LeadDetailDrawer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'info' | 'visits' | 'proposals' | 'notes'>('info');
   const [newNoteText, setNewNoteText] = useState('');
 
-  // Property Evaluation State (A partir dessa ficha o imóvel tem de ser avaliado)
-  const [evalRevenda, setEvalRevenda] = useState<string>('');
-  const [evalObras, setEvalObras] = useState<string>('0');
-  const [evalCustos, setEvalCustos] = useState<string>('3000');
-  const [evalMargemAlvo, setEvalMargemAlvo] = useState<string>('20000');
-  const [evalSavedSuccess, setEvalSavedSuccess] = useState(false);
-  const [lastEvalLeadId, setLastEvalLeadId] = useState<string | null>(null);
 
-  // Sync evaluation defaults when lead changes
-  useEffect(() => {
-    if (selectedLeadForDrawer && selectedLeadForDrawer.id !== lastEvalLeadId) {
-      const l = selectedLeadForDrawer;
-      const benchmarkRevenda = l.areaM2 && l.mediaFreguesiaM2
-        ? Math.round(l.areaM2 * l.mediaFreguesiaM2)
-        : Math.round(l.valorMinimoAbsoluto * 1.35);
-
-      const defaultRevenda = (l.valorMinimoAbsoluto + (l.margemPotencial || 0)) > l.valorMinimoAbsoluto
-        ? (l.valorMinimoAbsoluto + (l.margemPotencial || 0))
-        : benchmarkRevenda;
-
-      const defaultObras = l.estadoImovel === 'Ruína total' ? '30000'
-        : l.estadoImovel === 'A necessitar de obras profundas' ? '18000'
-        : l.estadoImovel === 'Habitável a precisar de modernização' ? '7500'
-        : '0';
-
-      const defaultCustos = String(Math.round(defaultRevenda * 0.04) || 3000);
-      const defaultMargem = String(l.margemPotencial && l.margemPotencial > 0 ? l.margemPotencial : Math.max(15000, Math.round(defaultRevenda * 0.15)));
-
-      setEvalRevenda(String(defaultRevenda));
-      setEvalObras(defaultObras);
-      setEvalCustos(defaultCustos);
-      setEvalMargemAlvo(defaultMargem);
-      setLastEvalLeadId(l.id);
-      setEvalSavedSuccess(false);
-    }
-  }, [selectedLeadForDrawer, lastEvalLeadId]);
 
   if (!selectedLeadForDrawer) return null;
 
@@ -113,54 +78,7 @@ export const LeadDetailDrawer: React.FC = () => {
     setIsLeadFormOpen(true);
   };
 
-  // Live Evaluation Calculations (A partir dessa ficha o imóvel pode ser avaliado)
-  const numRevenda = Number(evalRevenda) || 0;
-  const numObras = Number(evalObras) || 0;
-  const numCustos = Number(evalCustos) || 0;
-  const numMargemAlvo = Number(evalMargemAlvo) || 0;
 
-  // Maximum Allowable Offer (Teto Máximo de Compra Seguro)
-  const evalTetoCompra = Math.max(0, numRevenda - numObras - numCustos - numMargemAlvo);
-  // Sinal CPCV (10% padrão sobre o teto de compra)
-  const evalSinal10 = Math.round(evalTetoCompra * 0.10);
-  // Diferença vs Pedido do Proprietário
-  const deltaVsPedido = evalTetoCompra - (lead?.valorMinimoAbsoluto || 0);
-  // Rentabilidade s/ Sinal
-  const evalRoi = evalSinal10 > 0 ? Math.round((numMargemAlvo / evalSinal10) * 100) : 0;
-  const evalMultiplo = evalSinal10 > 0 ? (numMargemAlvo / evalSinal10).toFixed(1) : '0';
-  const evalSpread = numRevenda > 0 ? ((numMargemAlvo / numRevenda) * 100).toFixed(1) : '0';
-
-  const handleSaveEvaluation = () => {
-    if (!lead) return;
-    const updated: Lead = {
-      ...lead,
-      margemPotencial: numMargemAlvo
-    };
-    updateLead(updated);
-    setSelectedLeadForDrawer(updated);
-    setEvalSavedSuccess(true);
-    setTimeout(() => setEvalSavedSuccess(false), 3500);
-  };
-
-  const handleGenerateProposalFromEval = () => {
-    if (!lead) return;
-    setPrefilledProposalData({
-      leadId: lead.id,
-      valorProposta: evalTetoCompra > 0 ? evalTetoCompra : lead.valorMinimoAbsoluto,
-      valorSinal: evalSinal10 > 0 ? evalSinal10 : Math.round(lead.valorMinimoAbsoluto * 0.1),
-      valorRevenda: numRevenda,
-      notas: `Avaliação efetuada na ficha da lead: Revenda estimada ${formatCurrency(numRevenda)}, Obras ${formatCurrency(numObras)}, Custos/Reserva ${formatCurrency(numCustos)}, Margem Alvo ${formatCurrency(numMargemAlvo)}.`
-    });
-    setIsProposalFormOpen(true);
-  };
-
-  const handleResetToAveiroBenchmark = () => {
-    if (!lead) return;
-    const bm = lead.areaM2 && lead.mediaFreguesiaM2
-      ? Math.round(lead.areaM2 * lead.mediaFreguesiaM2)
-      : Math.round(lead.valorMinimoAbsoluto * 1.35);
-    setEvalRevenda(String(bm));
-  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
@@ -379,181 +297,9 @@ export const LeadDetailDrawer: React.FC = () => {
         {/* Drawer Body Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs text-stone-800">
           
-          {/* TAB 1: FICHA GERAL COMPLETA & AVALIAÇÃO DE IMÓVEL */}
+          {/* TAB 1: FICHA GERAL COMPLETA */}
           {activeTab === 'info' && (
             <div className="space-y-6">
-              
-              {/* SECTION: MOTOR INTERATIVO DE AVALIAÇÃO DO IMÓVEL (A partir dessa ficha o imóvel pode ser avaliado) */}
-              <div className="bg-[#141519] text-white p-5 rounded-2xl border border-stone-800 shadow-xl space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-800 pb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold">
-                      <Calculator className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-xs text-white uppercase tracking-wider flex items-center gap-1.5 font-display">
-                        <span>Avaliador & Simulador de Arbitragem</span>
-                        <span className="px-2 py-0.2 rounded-full text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 normal-case font-bold">
-                          Avaliação Direta
-                        </span>
-                      </h3>
-                      <p className="text-[11px] text-stone-400">
-                        Simulação de teto de compra, capital de sinal CPCV (10%) e retorno financeiro
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleResetToAveiroBenchmark}
-                    className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 self-start sm:self-auto transition"
-                    title="Recalcular revenda estimada com base no €/m² médio desta freguesia"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    <span>Média da Freguesia ({lead.mediaFreguesiaM2 || 1500} €/m²)</span>
-                  </button>
-                </div>
-
-                {/* 4 Interactive Evaluation Inputs */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div>
-                    <label className="text-[10px] font-bold uppercase text-stone-400 block mb-1">
-                      Revenda Estimada (€)
-                    </label>
-                    <input
-                      type="number"
-                      value={evalRevenda}
-                      onChange={e => setEvalRevenda(e.target.value)}
-                      placeholder="Ex: 180000"
-                      className="w-full px-3 py-2 bg-[#1C1E24] border border-stone-700 rounded-xl text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                    <span className="text-[9px] text-stone-500 block mt-0.5">Preço final de saída</span>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-bold uppercase text-stone-400 block mb-1">
-                      Obras / Limpeza (€)
-                    </label>
-                    <input
-                      type="number"
-                      value={evalObras}
-                      onChange={e => setEvalObras(e.target.value)}
-                      placeholder="Ex: 0 ou 15000"
-                      className="w-full px-3 py-2 bg-[#1C1E24] border border-stone-700 rounded-xl text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                    <span className="text-[9px] text-stone-500 block mt-0.5">0€ se for wholetailing</span>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-bold uppercase text-stone-400 block mb-1">
-                      Reserva & Custos (€)
-                    </label>
-                    <input
-                      type="number"
-                      value={evalCustos}
-                      onChange={e => setEvalCustos(e.target.value)}
-                      placeholder="Ex: 3000"
-                      className="w-full px-3 py-2 bg-[#1C1E24] border border-stone-700 rounded-xl text-white font-bold text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                    <span className="text-[9px] text-stone-500 block mt-0.5">CPCV, registos e folga</span>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-bold uppercase text-emerald-400 block mb-1">
-                      Margem Alvo (€)
-                    </label>
-                    <input
-                      type="number"
-                      value={evalMargemAlvo}
-                      onChange={e => setEvalMargemAlvo(e.target.value)}
-                      placeholder="Ex: 25000"
-                      className="w-full px-3 py-2 bg-[#1C1E24] border border-emerald-600/50 rounded-xl text-emerald-400 font-black text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                    <span className="text-[9px] text-emerald-500/80 block mt-0.5">Lucro pretendido</span>
-                  </div>
-                </div>
-
-                {/* Live Real-time Evaluation Results */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
-                  <div className="bg-[#191A20] p-3 rounded-xl border border-stone-800">
-                    <span className="text-[10px] font-bold uppercase text-stone-400 block">
-                      Teto Máximo Compra (MAO)
-                    </span>
-                    <span className="text-base font-black text-white mt-0.5 block font-display">
-                      {formatCurrency(evalTetoCompra)}
-                    </span>
-                    <span className={`text-[10px] font-bold block mt-0.5 ${
-                      deltaVsPedido >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                    }`}>
-                      {deltaVsPedido >= 0
-                        ? `+${formatCurrency(deltaVsPedido)} acima do mín.`
-                        : `Negociar -${formatCurrency(Math.abs(deltaVsPedido))}`}
-                    </span>
-                  </div>
-
-                  <div className="bg-[#191A20] p-3 rounded-xl border border-amber-500/30">
-                    <span className="text-[10px] font-bold uppercase text-amber-400 block">
-                      Sinal CPCV (10%)
-                    </span>
-                    <span className="text-base font-black text-amber-300 mt-0.5 block font-display">
-                      {formatCurrency(evalSinal10)}
-                    </span>
-                    <span className="text-[10px] text-stone-400 block mt-0.5">
-                      Capital a desembolsar
-                    </span>
-                  </div>
-
-                  <div className="bg-[#191A20] p-3 rounded-xl border border-emerald-500/30">
-                    <span className="text-[10px] font-bold uppercase text-emerald-400 block">
-                      Retorno Final (+€)
-                    </span>
-                    <span className="text-base font-black text-emerald-400 mt-0.5 block font-display">
-                      +{formatCurrency(numMargemAlvo)}
-                    </span>
-                    <span className="text-[10px] text-emerald-300/80 block mt-0.5">
-                      Spread: {evalSpread}%
-                    </span>
-                  </div>
-
-                  <div className="bg-[#191A20] p-3 rounded-xl border border-stone-700">
-                    <span className="text-[10px] font-bold uppercase text-stone-300 block">
-                      Rentabilidade / Múltiplo
-                    </span>
-                    <span className="text-base font-black text-amber-400 mt-0.5 block font-display">
-                      +{evalRoi}% <span className="text-xs text-white">({evalMultiplo}x)</span>
-                    </span>
-                    <span className="text-[10px] text-stone-400 block mt-0.5">
-                      ROI sobre o sinal pago
-                    </span>
-                  </div>
-                </div>
-
-                {/* Direct Evaluation Actions */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-2 border-t border-stone-800">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleSaveEvaluation}
-                      className="px-3.5 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 hover:text-white rounded-xl text-xs font-bold border border-stone-700 transition flex items-center gap-1.5"
-                    >
-                      <Save className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Guardar Avaliação na Lead</span>
-                    </button>
-                    {evalSavedSuccess && (
-                      <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 animate-fade-in">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Margem guardada!</span>
-                      </span>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={handleGenerateProposalFromEval}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black shadow-xs transition flex items-center justify-center gap-1.5"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>Gerar Proposta Formal a partir da Avaliação &rarr;</span>
-                  </button>
-                </div>
-              </div>
 
               {/* SECTION: ESTUDO DE MERCADO AVEIRO */}
               <div className="bg-[#FAF8F5] p-4 border border-stone-200 shadow-2xs space-y-3">

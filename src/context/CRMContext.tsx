@@ -244,34 +244,100 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [deleteImpactModal, setDeleteImpactModal] = useState<LeadDeleteImpact | null>(null);
 
-  // Load from Prisma via Next.js API bootstrap
+  // Real-time synchronization & bootstrap with Prisma DB
   useEffect(() => {
-    fetch('/api/bootstrap')
-      .then(res => res.json())
-      .then(data => {
-        if (data && Array.isArray(data.leads) && data.leads.length > 0) {
-          setLeads(data.leads);
-        } else if (INITIAL_LEADS.length > 0) {
-          const saved = getSafeLocalStorage('wt_crm_leads');
-          if (!saved || saved === '[]') {
-            setLeads(INITIAL_LEADS);
-          }
-        }
-        if (data) {
+    let isMounted = true;
+
+    const initialSync = async () => {
+      try {
+        const savedProposalsRaw = getSafeLocalStorage('wt_crm_proposals');
+        const savedLeadsRaw = getSafeLocalStorage('wt_crm_leads');
+        const savedProposals = savedProposalsRaw ? JSON.parse(savedProposalsRaw) : [];
+        const savedLeads = savedLeadsRaw ? JSON.parse(savedLeadsRaw) : [];
+
+        // Upload any proposals/leads that exist locally so the server DB has them
+        const res = await fetch('/api/bootstrap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+          body: JSON.stringify({
+            proposals: Array.isArray(savedProposals) ? savedProposals : [],
+            leads: Array.isArray(savedLeads) ? savedLeads : []
+          })
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (isMounted && data) {
+          if (Array.isArray(data.leads) && data.leads.length > 0) setLeads(data.leads);
           if (Array.isArray(data.visits)) setVisits(data.visits);
           if (Array.isArray(data.proposals)) setProposals(data.proposals);
-          if (Array.isArray(data.notes) && data.notes.length > 0) {
-            setNotes(data.notes);
-          } else if (INITIAL_NOTES.length > 0) {
-            const savedNotes = getSafeLocalStorage('wt_crm_notes');
-            if (!savedNotes || savedNotes === '[]') {
-              setNotes(INITIAL_NOTES);
-            }
-          }
+          if (Array.isArray(data.notes)) setNotes(data.notes);
           if (Array.isArray(data.operations)) setOperations(data.operations);
         }
-      })
-      .catch(err => console.warn('Prisma bootstrap loaded offline/local fallback:', err));
+      } catch (err) {
+        console.warn('Prisma initial sync warning:', err);
+      }
+    };
+
+    initialSync();
+
+    // Multi-device continuous synchronization (polling every 3.5s + window focus + tab visibility)
+    const pollSync = async () => {
+      try {
+        const res = await fetch(`/api/bootstrap?t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!isMounted || !data) return;
+
+        setLeads(prev => {
+          if (!Array.isArray(data.leads) || data.leads.length === 0) return prev;
+          const s = JSON.stringify(data.leads);
+          return s !== JSON.stringify(prev) ? data.leads : prev;
+        });
+        setProposals(prev => {
+          if (!Array.isArray(data.proposals)) return prev;
+          const s = JSON.stringify(data.proposals);
+          return s !== JSON.stringify(prev) ? data.proposals : prev;
+        });
+        setVisits(prev => {
+          if (!Array.isArray(data.visits)) return prev;
+          const s = JSON.stringify(data.visits);
+          return s !== JSON.stringify(prev) ? data.visits : prev;
+        });
+        setNotes(prev => {
+          if (!Array.isArray(data.notes)) return prev;
+          const s = JSON.stringify(data.notes);
+          return s !== JSON.stringify(prev) ? data.notes : prev;
+        });
+        setOperations(prev => {
+          if (!Array.isArray(data.operations)) return prev;
+          const s = JSON.stringify(data.operations);
+          return s !== JSON.stringify(prev) ? data.operations : prev;
+        });
+      } catch (e) {
+        // Silently ignore transient network errors
+      }
+    };
+
+    const intervalId = setInterval(pollSync, 3500);
+
+    const onFocus = () => { pollSync(); };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') pollSync();
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   // Sync with LocalStorage
@@ -335,6 +401,13 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setLeads(prev => [newLead, ...prev]);
+
+    fetch('/api/leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newLead)
+    }).catch(err => console.warn('Prisma lead create error:', err));
+
     return newLead;
   };
 
@@ -355,6 +428,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setLeads(prev => prev.map(l => l.id === finalLead.id ? finalLead : l));
+
+    fetch(`/api/leads/${finalLead.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(finalLead)
+    }).catch(err => console.warn('Prisma lead update error:', err));
   };
 
   const updateLeadPhase = (leadId: string, newPhase: LeadPhase) => {
@@ -407,6 +486,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       ...prev
     ]);
+
+    fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newNote)
+    }).catch(err => console.warn('Prisma note create error:', err));
   };
 
   const addCallNoteToLead = ({ leadId, text, callResult, date, nextContactDate }: AddCallNoteParams) => {
@@ -424,20 +509,23 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       leadId
     };
 
+    let newContactStatus: ContactStatus = 'Contactado';
+
     setLeads(prev => prev.map(l => {
       if (l.id === leadId) {
-        let newContactStatus: ContactStatus = l.contacto;
+        let cs: ContactStatus = l.contacto;
         if (callResult === 'Contactado' && l.contacto !== 'Reunião marcada') {
-          newContactStatus = 'Contactado';
+          cs = 'Contactado';
         } else if (callResult === 'Sem resposta' && l.contacto !== 'Reunião marcada') {
-          newContactStatus = 'Sem resposta';
+          cs = 'Sem resposta';
         } else if (callResult === 'Voltar a ligar' && l.contacto !== 'Reunião marcada') {
-          newContactStatus = 'Contactado';
+          cs = 'Contactado';
         }
+        newContactStatus = cs;
 
         return {
           ...l,
-          contacto: newContactStatus,
+          contacto: cs,
           notas: [newNote, ...(l.notas || [])]
         };
       }
@@ -452,6 +540,18 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       ...prev
     ]);
+
+    fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newNote)
+    }).catch(err => console.warn('Prisma call note create error:', err));
+
+    fetch(`/api/leads/${leadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contacto: newContactStatus })
+    }).catch(err => console.warn('Prisma lead contact status sync error:', err));
   };
 
   // GENERAL NOTES ACTIONS
@@ -477,19 +577,38 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
     }
 
+    fetch('/api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newNote)
+    }).catch(err => console.warn('Prisma note create error:', err));
+
     return newNote;
   };
 
   const updateNote = (updatedNote: Note) => {
     setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
+    fetch(`/api/notes/${updatedNote.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedNote)
+    }).catch(err => console.warn('Prisma note update error:', err));
   };
 
   const deleteNote = (noteId: string) => {
     setNotes(prev => prev.filter(n => n.id !== noteId));
+    fetch(`/api/notes/${noteId}`, { method: 'DELETE' }).catch(err => console.warn('Prisma note delete error:', err));
   };
 
   const togglePinNote = (noteId: string) => {
-    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, pinned: !n.pinned } : n));
+    const target = notes.find(n => n.id === noteId);
+    const newPinned = target ? !target.pinned : false;
+    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, pinned: newPinned } : n));
+    fetch(`/api/notes/${noteId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pinned: newPinned })
+    }).catch(err => console.warn('Prisma note pin toggle error:', err));
   };
 
   const requestDeleteLead = (leadId: string) => {
@@ -516,6 +635,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (selectedLeadForDrawer?.id === leadId) {
       setSelectedLeadForDrawer(null);
     }
+    fetch(`/api/leads/${leadId}`, { method: 'DELETE' }).catch(err => console.warn('Prisma lead delete error:', err));
   };
 
   // VISIT ACTIONS
@@ -535,8 +655,19 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setVisits(prev => [newVisit, ...prev]);
 
+    fetch('/api/visits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newVisit)
+    }).catch(err => console.warn('Prisma visit create error:', err));
+
     if (lead) {
       setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, contacto: 'Reunião marcada' as ContactStatus } : l));
+      fetch(`/api/leads/${lead.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contacto: 'Reunião marcada' })
+      }).catch(err => console.warn('Prisma lead meeting status sync error:', err));
     }
 
     return newVisit;
@@ -551,25 +682,42 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setVisits(prev => prev.map(v => v.id === finalVisit.id ? finalVisit : v));
+
+    fetch(`/api/visits/${finalVisit.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(finalVisit)
+    }).catch(err => console.warn('Prisma visit update error:', err));
   };
 
   const deleteVisit = (visitId: string) => {
     setVisits(prev => prev.filter(v => v.id !== visitId));
+    fetch(`/api/visits/${visitId}`, { method: 'DELETE' }).catch(err => console.warn('Prisma visit delete error:', err));
   };
 
   const toggleVisitRealizada = (visitId: string) => {
+    const targetVisit = visits.find(v => v.id === visitId);
+    if (!targetVisit) return;
+    const isRealizada = targetVisit.estado === 'Realizada';
+    const newState = isRealizada ? 'Marcada' : 'Realizada';
+    const realizadaEm = !isRealizada ? new Date().toISOString() : undefined;
+
     setVisits(prev => prev.map(v => {
       if (v.id === visitId) {
-        const isRealizada = v.estado === 'Realizada';
-        const newState = isRealizada ? 'Marcada' : 'Realizada';
         return {
           ...v,
           estado: newState,
-          realizadaEm: !isRealizada ? new Date().toISOString() : undefined
+          realizadaEm
         };
       }
       return v;
     }));
+
+    fetch(`/api/visits/${visitId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado: newState, realizadaEm: realizadaEm || null })
+    }).catch(err => console.warn('Prisma visit toggle error:', err));
   };
 
   // PROPOSAL ACTIONS
@@ -600,6 +748,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setProposals(prev => [newProposal, ...prev]);
 
+    fetch('/api/proposals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newProposal)
+    }).catch(err => console.warn('Prisma proposal create error:', err));
+
     if (lead && lead.fase === 'Nova lead') {
       updateLeadPhase(lead.id, 'Em análise');
     }
@@ -625,10 +779,17 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setProposals(prev => prev.map(p => p.id === finalProposal.id ? finalProposal : p));
+
+    fetch(`/api/proposals/${finalProposal.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(finalProposal)
+    }).catch(err => console.warn('Prisma proposal update error:', err));
   };
 
   const deleteProposal = (proposalId: string) => {
     setProposals(prev => prev.filter(p => p.id !== proposalId));
+    fetch(`/api/proposals/${proposalId}`, { method: 'DELETE' }).catch(err => console.warn('Prisma proposal delete error:', err));
   };
 
   const acceptProposal = (proposalId: string) => {
@@ -636,6 +797,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!prop) return;
 
     setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, estado: 'Aceite' } : p));
+
+    fetch(`/api/proposals/${proposalId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado: 'Aceite' })
+    }).catch(err => console.warn('Prisma proposal accept error:', err));
 
     if (prop.leadId) {
       updateLeadPhase(prop.leadId, 'CPCV a preparar');
@@ -678,6 +845,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           notas: `Proposta aceite em ${new Date().toISOString().split('T')[0]}. Teste de interesse no Facebook em curso.`
         };
         setOperations(prev => [newOp, ...prev]);
+
+        fetch('/api/operations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newOp)
+        }).catch(err => console.warn('Prisma op create error:', err));
       }
     }
   };
@@ -690,14 +863,27 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id
     };
     setOperations(prev => [newOp, ...prev]);
+
+    fetch('/api/operations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newOp)
+    }).catch(err => console.warn('Prisma op create error:', err));
+
     return newOp;
   };
 
   const updateOperation = (updatedOp: DealOperation) => {
     setOperations(prev => prev.map(o => o.id === updatedOp.id ? updatedOp : o));
+    fetch(`/api/operations/${updatedOp.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedOp)
+    }).catch(err => console.warn('Prisma op update error:', err));
   };
 
   const updateOperationStage = (opId: string, stage: OperationStage) => {
+    let updatesPayload: Partial<DealOperation> = { fase: stage };
     setOperations(prev => prev.map(o => {
       if (o.id === opId) {
         const updates: Partial<DealOperation> = { fase: stage };
@@ -708,29 +894,47 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           updates.dataVendaFechada = new Date().toISOString().split('T')[0];
           updates.lucroRealizado = o.valorVendaRealizado ? (o.valorVendaRealizado - o.valorCompraAcordado) : o.margemPrevista;
         }
+        updatesPayload = updates;
         return { ...o, ...updates };
       }
       return o;
     }));
+
+    fetch(`/api/operations/${opId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatesPayload)
+    }).catch(err => console.warn('Prisma op stage update error:', err));
   };
 
   const toggleChecklistDoc = (opId: string, docKey: keyof DocumentChecklist) => {
+    let newChecklist: any = null;
     setOperations(prev => prev.map(o => {
       if (o.id === opId) {
+        newChecklist = {
+          ...o.checklist,
+          [docKey]: !o.checklist[docKey]
+        };
         return {
           ...o,
-          checklist: {
-            ...o.checklist,
-            [docKey]: !o.checklist[docKey]
-          }
+          checklist: newChecklist
         };
       }
       return o;
     }));
+
+    if (newChecklist) {
+      fetch(`/api/operations/${opId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checklist: newChecklist })
+      }).catch(err => console.warn('Prisma op checklist toggle error:', err));
+    }
   };
 
   const deleteOperation = (opId: string) => {
     setOperations(prev => prev.filter(o => o.id !== opId));
+    fetch(`/api/operations/${opId}`, { method: 'DELETE' }).catch(err => console.warn('Prisma op delete error:', err));
   };
 
   const addOperationNote = (opId: string, text: string) => {
@@ -750,6 +954,12 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return o;
     }));
+
+    fetch(`/api/operations/${opId}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.trim(), author: currentUser })
+    }).catch(err => console.warn('Prisma op note create error:', err));
   };
 
   return (
