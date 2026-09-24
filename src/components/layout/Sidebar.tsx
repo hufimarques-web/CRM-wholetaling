@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   LayoutDashboard,
   Columns,
@@ -34,7 +34,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
 
   const userTheme = getUserTheme(currentUser);
 
-  const navItems = [
+  const counts = useMemo(() => ({
+    activeLeads: leads.filter(l => l.fase !== 'Descartada').length,
+    notes: notes.length,
+    upcomingVisits: visits.filter(v => v.estado === 'Marcada' || v.estado === 'Confirmada').length,
+    activeProposals: proposals.filter(p => p.estado === 'Enviada' || p.estado === 'Em negociação').length,
+    activeOperations: operations.filter(o => o.fase !== 'Venda_Fechada' && o.fase !== 'Cancelado').length,
+    discardedLeads: leads.filter(l => l.fase === 'Descartada').length
+  }), [leads, notes, visits, proposals, operations]);
+
+  const navItems = useMemo(() => [
     {
       id: 'dashboard',
       label: 'Dashboard',
@@ -45,44 +54,45 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       id: 'leads',
       label: 'Leads & Funil',
       icon: Columns,
-      badge: leads.filter(l => l.fase !== 'Descartada').length
+      badge: counts.activeLeads
     },
     {
       id: 'notes',
       label: 'Notas & Follow-ups',
       icon: StickyNote,
-      badge: notes.length
+      badge: counts.notes
     },
     {
       id: 'calendar',
       label: 'Calendário Visitas',
       icon: Calendar,
-      badge: visits.filter(v => v.estado === 'Marcada' || v.estado === 'Confirmada').length
+      badge: counts.upcomingVisits
     },
     {
       id: 'proposals',
       label: 'Propostas & Sinal',
       icon: FileText,
-      badge: proposals.filter(p => p.estado === 'Enviada' || p.estado === 'Em negociação').length
+      badge: counts.activeProposals
     },
     {
       id: 'operations',
       label: 'Operações & CPCV',
       icon: ShieldCheck,
-      badge: operations.filter(o => o.fase !== 'Venda_Fechada' && o.fase !== 'Cancelado').length
+      badge: counts.activeOperations
     },
     {
       id: 'discarded',
       label: 'Descartadas',
       icon: Archive,
-      badge: leads.filter(l => l.fase === 'Descartada').length
-    },
-  ] as const;
+      badge: counts.discardedLeads
+    }
+  ] as const, [counts]);
 
   const handleNavClick = (id: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded') => {
     setActiveTab(id);
     setMobileOpen(false);
   };
+
 
   return (
     <>

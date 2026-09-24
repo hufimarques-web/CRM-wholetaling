@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useDeferredValue } from 'react';
 import { Plus, Columns, Table, Filter, RotateCcw, Building, Search, Sparkles } from 'lucide-react';
 import { useCRM } from '../context/CRMContext';
 import { LeadPhase, ContactStatus, PhotoStatus, PriorityLevel, AppUser, MarketDealRating } from '../types/crm';
@@ -16,6 +16,9 @@ export const LeadsView: React.FC = () => {
     setEditingLead
   } = useCRM();
 
+  // Defer search computation for 120fps responsive typing
+  const deferredSearch = useDeferredValue(globalSearch);
+
   // Filters State
   const [userFilter, setUserFilter] = useState<'Todos' | AppUser>('Todos');
   const [faseFilter, setFaseFilter] = useState<LeadPhase | 'Todas'>('Todas');
@@ -31,6 +34,8 @@ export const LeadsView: React.FC = () => {
 
   // Filtered Leads logic (Excluded discarded leads from main pipeline by default)
   const filteredLeads = useMemo(() => {
+    const query = deferredSearch.toLowerCase().trim();
+
     return leads.filter(l => {
       // Discarded leads disappear from main page and live in the 'Descartadas' tab
       if (faseFilter !== 'Descartada' && l.fase === 'Descartada') {
@@ -38,8 +43,7 @@ export const LeadsView: React.FC = () => {
       }
 
       // Global Search
-      if (globalSearch.trim()) {
-        const query = globalSearch.toLowerCase().trim();
+      if (query) {
         const matchesQuery =
           l.nomeProprietario.toLowerCase().includes(query) ||
           l.freguesia.toLowerCase().includes(query) ||
@@ -63,16 +67,24 @@ export const LeadsView: React.FC = () => {
       return true;
     })
     .sort((a, b) => {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      if (timeA !== timeB) return timeB - timeA;
+      const dateA = a.createdAt || '';
+      const dateB = b.createdAt || '';
+      if (dateA !== dateB) return dateB.localeCompare(dateA);
       return a.id.localeCompare(b.id);
     });
-  }, [leads, globalSearch, userFilter, faseFilter, contactoFilter, freguesiaFilter]);
+  }, [leads, deferredSearch, userFilter, faseFilter, contactoFilter, freguesiaFilter]);
 
-  // Aggregate Total Value of Filtered Leads
-  const totalMinimoValor = filteredLeads.reduce((acc, curr) => acc + (curr.valorMinimoAbsoluto || 0), 0);
-  const totalMargem = filteredLeads.reduce((acc, curr) => acc + (curr.margemPotencial || 0), 0);
+  // Aggregate Total Value of Filtered Leads (Memoized)
+  const { totalMinimoValor, totalMargem } = useMemo(() => {
+    let min = 0;
+    let marg = 0;
+    for (let i = 0; i < filteredLeads.length; i++) {
+      min += filteredLeads[i].valorMinimoAbsoluto || 0;
+      marg += filteredLeads[i].margemPotencial || 0;
+    }
+    return { totalMinimoValor: min, totalMargem: marg };
+  }, [filteredLeads]);
+
 
   const hasActiveFilters =
     userFilter !== 'Todos' ||

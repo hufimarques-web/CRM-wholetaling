@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Building2, PhoneCall, Search, Calendar, FileText, CheckCircle2,
   TrendingUp, ArrowRight, MapPin, Clock, StickyNote, Plus, Pin, Sparkles, User, Check, ShieldCheck
@@ -29,72 +29,108 @@ export const DashboardView: React.FC = () => {
   const [dashboardNoteText, setDashboardNoteText] = useState('');
   const [showDealsBreakdown, setShowDealsBreakdown] = useState(false);
 
-  // Active Leads (Descartadas desaparecem da página principal)
-  const activeLeads = leads.filter(l => l.fase !== 'Descartada');
-  const discardedLeadsCount = leads.filter(l => l.fase === 'Descartada').length;
+  // Active Leads & Proposals Calculations (Memoized for high performance)
+  const {
+    activeLeads,
+    discardedLeadsCount,
+    activeProposalsWithCapital,
+    totalSinalCapitalInvestido,
+    totalRetornoFinalValor,
+    totalRetornoPercent,
+    multiploCapital,
+    totalLeads,
+    porContactar,
+    totalMargem,
+    propostasAceites,
+    totalSinais,
+    operacoesAtivas,
+    totalLucroFechado,
+    topMarginDeals,
+    upcomingVisits,
+    activeProposals,
+    dashboardNotes
+  } = useMemo(() => {
+    const actLeads = leads.filter(l => l.fase !== 'Descartada');
+    const discCount = leads.length - actLeads.length;
 
-  // Active Proposals with committed / to be paid capital
-  const activeProposalsWithCapital = proposals.filter(
-    p => p.estado === 'Enviada' || p.estado === 'Em negociação' || p.estado === 'Aceite'
-  );
+    const activePropsWithCapital = proposals.filter(
+      p => p.estado === 'Enviada' || p.estado === 'Em negociação' || p.estado === 'Aceite'
+    );
 
-  // Sinal CPCV a ser pago de capital investido
-  const totalSinalCapitalInvestido = activeProposalsWithCapital.reduce(
-    (acc, curr) => acc + (curr.valorSinal || Math.round(curr.valorProposta * 0.1)),
-    0
-  );
+    let sinalCap = 0;
+    let retornoVal = 0;
+    for (let i = 0; i < activePropsWithCapital.length; i++) {
+      const p = activePropsWithCapital[i];
+      sinalCap += p.valorSinal || Math.round(p.valorProposta * 0.1);
+      retornoVal += p.margemPrevista || (p.valorRevenda - p.valorProposta);
+    }
 
-  // Retorno em valor final (Soma das margens previstas dos negócios)
-  const totalRetornoFinalValor = activeProposalsWithCapital.reduce(
-    (acc, curr) => acc + (curr.margemPrevista || (curr.valorRevenda - curr.valorProposta)),
-    0
-  );
+    const retPercent = sinalCap > 0 ? Math.round((retornoVal / sinalCap) * 100) : 0;
+    const multCap = sinalCap > 0 ? (retornoVal / sinalCap).toFixed(1) : '0.0';
 
-  // Retorno em % (ROI sobre capital investido em sinal)
-  const totalRetornoPercent = totalSinalCapitalInvestido > 0
-    ? Math.round((totalRetornoFinalValor / totalSinalCapitalInvestido) * 100)
-    : 0;
+    let notContacted = 0;
+    let margemTot = 0;
+    for (let i = 0; i < actLeads.length; i++) {
+      if (actLeads[i].contacto === 'Não contactado') notContacted++;
+      margemTot += actLeads[i].margemPotencial || 0;
+    }
 
-  // Múltiplo do Sinal
-  const multiploCapital = totalSinalCapitalInvestido > 0
-    ? (totalRetornoFinalValor / totalSinalCapitalInvestido).toFixed(1)
-    : '0.0';
+    let aceites = 0;
+    for (let i = 0; i < proposals.length; i++) {
+      if (proposals[i].estado === 'Aceite') aceites++;
+    }
 
-  // Primary Metrics
-  const totalLeads = activeLeads.length;
-  const porContactar = activeLeads.filter(l => l.contacto === 'Não contactado').length;
-  const totalMargem = activeLeads.reduce((acc, curr) => acc + (curr.margemPotencial || 0), 0);
-  const propostasAceites = proposals.filter(p => p.estado === 'Aceite').length;
-  const totalSinais = totalSinalCapitalInvestido;
-  const operacoesAtivas = operations.filter(o => o.fase !== 'Venda_Fechada' && o.fase !== 'Cancelado').length;
-  const totalLucroFechado = operations
-    .filter(o => o.fase === 'Venda_Fechada')
-    .reduce((acc, curr) => acc + (curr.lucroRealizado || 0), 0);
+    let opsAtivas = 0;
+    let lucroFech = 0;
+    for (let i = 0; i < operations.length; i++) {
+      const o = operations[i];
+      if (o.fase !== 'Venda_Fechada' && o.fase !== 'Cancelado') opsAtivas++;
+      if (o.fase === 'Venda_Fechada') lucroFech += o.lucroRealizado || 0;
+    }
 
-  // Top Deals by Potential Margin (Apenas leads ativas)
-  const topMarginDeals = [...activeLeads]
-    .sort((a, b) => (b.margemPotencial || 0) - (a.margemPotencial || 0))
-    .slice(0, 4);
+    const topDeals = [...actLeads]
+      .sort((a, b) => (b.margemPotencial || 0) - (a.margemPotencial || 0))
+      .slice(0, 4);
 
-  // Upcoming Visits
-  const upcomingVisits = [...visits]
-    .filter(v => v.estado === 'Marcada' || v.estado === 'Confirmada')
-    .sort((a, b) => new Date(`${a.data}T${a.hora}`).getTime() - new Date(`${b.data}T${b.hora}`).getTime())
-    .slice(0, 4);
+    const upVisits = [...visits]
+      .filter(v => v.estado === 'Marcada' || v.estado === 'Confirmada')
+      .sort((a, b) => `${a.data}T${a.hora}`.localeCompare(`${b.data}T${b.hora}`))
+      .slice(0, 4);
 
-  // Active Proposals with Multiplier
-  const activeProposals = proposals
-    .filter(p => p.estado === 'Enviada' || p.estado === 'Em negociação')
-    .slice(0, 4);
+    const actProps = proposals
+      .filter(p => p.estado === 'Enviada' || p.estado === 'Em negociação')
+      .slice(0, 4);
 
-  // Dashboard Notes (Sorted: pinned first, then recent)
-  const dashboardNotes = [...notes]
-    .sort((a, b) => {
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    })
-    .slice(0, 6);
+    const dNotes = [...notes]
+      .sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return (b.date || '').localeCompare(a.date || '');
+      })
+      .slice(0, 6);
+
+    return {
+      activeLeads: actLeads,
+      discardedLeadsCount: discCount,
+      activeProposalsWithCapital: activePropsWithCapital,
+      totalSinalCapitalInvestido: sinalCap,
+      totalRetornoFinalValor: retornoVal,
+      totalRetornoPercent: retPercent,
+      multiploCapital: multCap,
+      totalLeads: actLeads.length,
+      porContactar: notContacted,
+      totalMargem: margemTot,
+      propostasAceites: aceites,
+      totalSinais: sinalCap,
+      operacoesAtivas: opsAtivas,
+      totalLucroFechado: lucroFech,
+      topMarginDeals: topDeals,
+      upcomingVisits: upVisits,
+      activeProposals: actProps,
+      dashboardNotes: dNotes
+    };
+  }, [leads, proposals, visits, notes, operations]);
+
 
   const handleCreateDashboardNote = (e: React.FormEvent) => {
     e.preventDefault();

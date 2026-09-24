@@ -3,9 +3,23 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
     @apply bg-[#F7F5F0] text-stone-900 antialiased font-sans;
     background-color: #F7F5F0;
+    overflow-x: hidden;
+  }
+
+  /* GPU accelerated elements for 60/120fps smoothness */
+  button, a, input, select, textarea {
+    touch-action: manipulation;
   }
 }
 
@@ -24,3 +38,30 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #B8B0A2;
 }
+
+/* Smooth micro-interactions & GPU utilities */
+.gpu-smooth {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.transition-smooth {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-smooth-in {
+  animation: fadeInScale 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+

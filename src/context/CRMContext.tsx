@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Lead, Visit, Proposal, LeadPhase, ContactStatus, Note, CallResult, AppUser, DealOperation, OperationStage, DocumentChecklist, OperationNote } from '../types/crm';
 import { INITIAL_LEADS, INITIAL_VISITS, INITIAL_PROPOSALS, INITIAL_NOTES, INITIAL_OPERATIONS } from '../data/initialData';
 import { analyzeLeadMarket } from '../data/marketData';
@@ -144,6 +144,22 @@ const setSafeLocalStorage = (key: string, value: string) => {
   } catch {}
 };
 
+// Fast shallow check before expensive deep JSON equality
+const areEntitiesEqual = (a: any[], b: any[]): boolean => {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const itemA = a[i];
+    const itemB = b[i];
+    if (itemA.id !== itemB.id) return false;
+    if (itemA.fase !== itemB.fase) return false;
+    if (itemA.contacto !== itemB.contacto) return false;
+    if (itemA.estado !== itemB.estado) return false;
+    if (itemA.updatedAt && itemB.updatedAt && itemA.updatedAt !== itemB.updatedAt) return false;
+  }
+  return JSON.stringify(a) === JSON.stringify(b);
+};
+
 export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -156,17 +172,22 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return 'Queirós';
   });
 
-  const login = (user: AppUser) => {
+  const currentUserRef = useRef<AppUser>(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  const login = useCallback((user: AppUser) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setSafeLocalStorage('wt_crm_current_user', user);
     setSafeLocalStorage('wt_crm_auth', 'true');
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setIsAuthenticated(false);
     setSafeLocalStorage('wt_crm_auth', 'false');
-  };
+  }, []);
 
   // Navigation & Search
   const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded'>('leads');
@@ -180,6 +201,18 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [proposals, setProposals] = useState<Proposal[]>(INITIAL_PROPOSALS);
   const [notes, setNotes] = useState<Note[]>(INITIAL_NOTES);
   const [operations, setOperations] = useState<DealOperation[]>(INITIAL_OPERATIONS);
+
+  // Keep references for stable callbacks without stale closures
+  const leadsRef = useRef(leads);
+  useEffect(() => { leadsRef.current = leads; }, [leads]);
+  const visitsRef = useRef(visits);
+  useEffect(() => { visitsRef.current = visits; }, [visits]);
+  const proposalsRef = useRef(proposals);
+  useEffect(() => { proposalsRef.current = proposals; }, [proposals]);
+  const notesRef = useRef(notes);
+  useEffect(() => { notesRef.current = notes; }, [notes]);
+  const operationsRef = useRef(operations);
+  useEffect(() => { operationsRef.current = operations; }, [operations]);
 
   // Modal / Drawer Controls
   const [selectedLeadForDrawer, setSelectedLeadForDrawer] = useState<Lead | null>(null);
@@ -250,8 +283,13 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     initialSync();
 
-    // Multi-device continuous synchronization (polling every 3.5s + window focus + tab visibility)
+    // Multi-device synchronization with smart background pausing & fast checksum
     const pollSync = async () => {
+      // Pause polling completely if tab is hidden / minimized to save battery and network
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
+
       try {
         const res = await fetch(`/api/bootstrap?t=${Date.now()}`, {
           headers: {
@@ -263,37 +301,17 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const data = await res.json();
         if (!isMounted || !data) return;
 
-        setLeads(prev => {
-          if (!Array.isArray(data.leads)) return prev;
-          const s = JSON.stringify(data.leads);
-          return s !== JSON.stringify(prev) ? data.leads : prev;
-        });
-        setProposals(prev => {
-          if (!Array.isArray(data.proposals)) return prev;
-          const s = JSON.stringify(data.proposals);
-          return s !== JSON.stringify(prev) ? data.proposals : prev;
-        });
-        setVisits(prev => {
-          if (!Array.isArray(data.visits)) return prev;
-          const s = JSON.stringify(data.visits);
-          return s !== JSON.stringify(prev) ? data.visits : prev;
-        });
-        setNotes(prev => {
-          if (!Array.isArray(data.notes)) return prev;
-          const s = JSON.stringify(data.notes);
-          return s !== JSON.stringify(prev) ? data.notes : prev;
-        });
-        setOperations(prev => {
-          if (!Array.isArray(data.operations)) return prev;
-          const s = JSON.stringify(data.operations);
-          return s !== JSON.stringify(prev) ? data.operations : prev;
-        });
+        setLeads(prev => (Array.isArray(data.leads) && !areEntitiesEqual(prev, data.leads) ? data.leads : prev));
+        setProposals(prev => (Array.isArray(data.proposals) && !areEntitiesEqual(prev, data.proposals) ? data.proposals : prev));
+        setVisits(prev => (Array.isArray(data.visits) && !areEntitiesEqual(prev, data.visits) ? data.visits : prev));
+        setNotes(prev => (Array.isArray(data.notes) && !areEntitiesEqual(prev, data.notes) ? data.notes : prev));
+        setOperations(prev => (Array.isArray(data.operations) && !areEntitiesEqual(prev, data.operations) ? data.operations : prev));
       } catch (e) {
         // Silently ignore transient network errors
       }
     };
 
-    const intervalId = setInterval(pollSync, 3500);
+    const intervalId = setInterval(pollSync, 8000);
 
     const onFocus = () => { pollSync(); };
     const onVisibility = () => {
@@ -314,22 +332,30 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (selectedLeadForDrawer) {
       const updated = leads.find(l => l.id === selectedLeadForDrawer.id);
-      if (updated) setSelectedLeadForDrawer(updated);
+      if (updated && (
+        updated.fase !== selectedLeadForDrawer.fase ||
+        updated.contacto !== selectedLeadForDrawer.contacto ||
+        updated.notas?.length !== selectedLeadForDrawer.notas?.length ||
+        updated.valorMinimoAbsoluto !== selectedLeadForDrawer.valorMinimoAbsoluto
+      )) {
+        setSelectedLeadForDrawer(updated);
+      }
     }
-  }, [leads]);
+  }, [leads, selectedLeadForDrawer]);
 
-  const openCallModal = (leadId: string) => {
+  const openCallModal = useCallback((leadId: string) => {
     setCallModalLeadId(leadId);
     setIsCallModalOpen(true);
-  };
+  }, []);
 
-  const openAIAnalysis = (lead: Lead) => {
+  const openAIAnalysis = useCallback((lead: Lead) => {
     setAITargetLead(lead);
     setIsAIModalOpen(true);
-  };
+  }, []);
+
 
   // LEAD ACTIONS
-  const addLead = (leadData: Omit<Lead, 'id' | 'dataEntrada' | 'margemPotencial' | 'notas' | 'assignedTo'> & { notas?: Note[] }): Lead => {
+  const addLead = useCallback((leadData: Omit<Lead, 'id' | 'dataEntrada' | 'margemPotencial' | 'notas' | 'assignedTo'> & { notas?: Note[] }): Lead => {
     const id = 'lead-' + Date.now();
     const dataEntrada = new Date().toISOString().split('T')[0];
     
@@ -339,13 +365,13 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       : undefined;
     const margemPotencial = Math.round(leadData.valorMinimoAbsoluto * 0.30);
 
-    // Locked to session active user!
+    const user = currentUserRef.current;
     const newLead: Lead = {
       ...leadData,
       id,
       dataEntrada,
       margemPotencial,
-      assignedTo: currentUser,
+      assignedTo: user,
       precoM2,
       notas: leadData.notas || []
     };
@@ -359,9 +385,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(err => console.warn('Prisma lead create error:', err));
 
     return newLead;
-  };
+  }, []);
 
-  const updateLead = (updatedLead: Lead) => {
+  const updateLead = useCallback((updatedLead: Lead) => {
     const precoM2 = updatedLead.areaM2 && updatedLead.areaM2 > 0
       ? Math.round(updatedLead.valorMinimoAbsoluto / updatedLead.areaM2)
       : undefined;
@@ -384,34 +410,24 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(finalLead)
     }).catch(err => console.warn('Prisma lead update error:', err));
-  };
+  }, []);
 
-  const updateLeadPhase = (leadId: string, newPhase: LeadPhase) => {
+  const updateLeadPhase = useCallback((leadId: string, newPhase: LeadPhase) => {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, fase: newPhase } : l));
     fetch(`/api/leads/${leadId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fase: newPhase })
     }).catch(err => console.warn('Prisma phase sync error:', err));
-  };
+  }, []);
 
-  const discardLead = (leadId: string, reason?: string) => {
-    if (reason && reason.trim()) {
-      addNoteToLead(leadId, `Motivo de Descarte: ${reason.trim()}`);
-    }
-    updateLeadPhase(leadId, 'Descartada');
-  };
-
-  const restoreLead = (leadId: string, targetPhase: LeadPhase = 'Nova lead') => {
-    updateLeadPhase(leadId, targetPhase);
-  };
-
-  const addNoteToLead = (leadId: string, text: string) => {
+  const addNoteToLead = useCallback((leadId: string, text: string) => {
     if (!text.trim()) return;
+    const user = currentUserRef.current;
     const newNote: Note = {
       id: 'note-' + Date.now(),
-      author: currentUser,
-      assignedUser: currentUser,
+      author: user,
+      assignedUser: user,
       date: new Date().toISOString(),
       text: text.trim(),
       type: 'general',
@@ -428,7 +444,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return l;
     }));
 
-    const targetLead = leads.find(l => l.id === leadId);
+    const targetLead = leadsRef.current.find(l => l.id === leadId);
     setNotes(prev => [
       {
         ...newNote,
@@ -442,15 +458,26 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newNote)
     }).catch(err => console.warn('Prisma note create error:', err));
-  };
+  }, []);
 
-  const addCallNoteToLead = ({ leadId, text, callResult, date, nextContactDate }: AddCallNoteParams) => {
+  const discardLead = useCallback((leadId: string, reason?: string) => {
+    if (reason && reason.trim()) {
+      addNoteToLead(leadId, `Motivo de Descarte: ${reason.trim()}`);
+    }
+    updateLeadPhase(leadId, 'Descartada');
+  }, [addNoteToLead, updateLeadPhase]);
+
+  const restoreLead = useCallback((leadId: string, targetPhase: LeadPhase = 'Nova lead') => {
+    updateLeadPhase(leadId, targetPhase);
+  }, [updateLeadPhase]);
+
+  const addCallNoteToLead = useCallback(({ leadId, text, callResult, date, nextContactDate }: AddCallNoteParams) => {
     if (!text.trim()) return;
-    
+    const user = currentUserRef.current;
     const newNote: Note = {
       id: 'note-call-' + Date.now(),
-      author: currentUser,
-      assignedUser: currentUser,
+      author: user,
+      assignedUser: user,
       date: date || new Date().toISOString(),
       text: text.trim(),
       type: 'call',
@@ -482,7 +509,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return l;
     }));
 
-    const targetLead = leads.find(l => l.id === leadId);
+    const targetLead = leadsRef.current.find(l => l.id === leadId);
     setNotes(prev => [
       {
         ...newNote,
@@ -502,15 +529,16 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contacto: newContactStatus })
     }).catch(err => console.warn('Prisma lead contact status sync error:', err));
-  };
+  }, []);
 
   // GENERAL NOTES ACTIONS
-  const addNote = (noteData: Omit<Note, 'id' | 'date' | 'author' | 'assignedUser'> & { date?: string }): Note => {
+  const addNote = useCallback((noteData: Omit<Note, 'id' | 'date' | 'author' | 'assignedUser'> & { date?: string }): Note => {
+    const user = currentUserRef.current;
     const newNote: Note = {
       ...noteData,
       id: 'note-' + Date.now(),
-      author: currentUser,
-      assignedUser: currentUser,
+      author: user,
+      assignedUser: user,
       date: noteData.date || new Date().toISOString()
     };
     setNotes(prev => [newNote, ...prev]);
@@ -534,24 +562,24 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(err => console.warn('Prisma note create error:', err));
 
     return newNote;
-  };
+  }, []);
 
-  const updateNote = (updatedNote: Note) => {
+  const updateNote = useCallback((updatedNote: Note) => {
     setNotes(prev => prev.map(n => n.id === updatedNote.id ? updatedNote : n));
     fetch(`/api/notes/${updatedNote.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedNote)
     }).catch(err => console.warn('Prisma note update error:', err));
-  };
+  }, []);
 
-  const deleteNote = (noteId: string) => {
+  const deleteNote = useCallback((noteId: string) => {
     setNotes(prev => prev.filter(n => n.id !== noteId));
     fetch(`/api/notes/${noteId}`, { method: 'DELETE' }).catch(err => console.warn('Prisma note delete error:', err));
-  };
+  }, []);
 
-  const togglePinNote = (noteId: string) => {
-    const target = notes.find(n => n.id === noteId);
+  const togglePinNote = useCallback((noteId: string) => {
+    const target = notesRef.current.find(n => n.id === noteId);
     const newPinned = target ? !target.pinned : false;
     setNotes(prev => prev.map(n => n.id === noteId ? { ...n, pinned: newPinned } : n));
     fetch(`/api/notes/${noteId}`, {
@@ -559,47 +587,46 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pinned: newPinned })
     }).catch(err => console.warn('Prisma note pin toggle error:', err));
-  };
+  }, []);
 
-  const requestDeleteLead = (leadId: string) => {
-    const lead = leads.find(l => l.id === leadId);
+  const requestDeleteLead = useCallback((leadId: string) => {
+    const lead = leadsRef.current.find(l => l.id === leadId);
     if (!lead) return;
 
-    const assocVisits = visits.filter(v => v.leadId === leadId);
-    const assocProposals = proposals.filter(p => p.leadId === leadId);
+    const assocVisits = visitsRef.current.filter(v => v.leadId === leadId);
+    const assocProposals = proposalsRef.current.filter(p => p.leadId === leadId);
 
     setDeleteImpactModal({
       lead,
       visitCount: assocVisits.length,
       proposalCount: assocProposals.length
     });
-  };
+  }, []);
 
-  const confirmDeleteLead = (leadId: string) => {
+  const confirmDeleteLead = useCallback((leadId: string) => {
     setLeads(prev => prev.filter(l => l.id !== leadId));
     setVisits(prev => prev.filter(v => v.leadId !== leadId));
     setProposals(prev => prev.filter(p => p.leadId !== leadId));
     setNotes(prev => prev.filter(n => n.leadId !== leadId));
     setOperations(prev => prev.filter(o => o.leadId !== leadId));
     setDeleteImpactModal(null);
-    if (selectedLeadForDrawer?.id === leadId) {
-      setSelectedLeadForDrawer(null);
-    }
+    setSelectedLeadForDrawer(prev => (prev?.id === leadId ? null : prev));
     fetch(`/api/leads/${leadId}`, { method: 'DELETE' }).catch(err => console.warn('Prisma lead delete error:', err));
-  };
+  }, []);
 
   // VISIT ACTIONS
-  const addVisit = (visitData: Omit<Visit, 'id' | 'nomeProprietario' | 'moradaZona' | 'concelhoFreguesia' | 'responsavel' | 'assignedUser'>): Visit => {
-    const lead = leads.find(l => l.id === visitData.leadId);
+  const addVisit = useCallback((visitData: Omit<Visit, 'id' | 'nomeProprietario' | 'moradaZona' | 'concelhoFreguesia' | 'responsavel' | 'assignedUser'>): Visit => {
+    const lead = leadsRef.current.find(l => l.id === visitData.leadId);
     const id = 'vis-' + Date.now();
+    const user = currentUserRef.current;
 
     const newVisit: Visit = {
       ...visitData,
       id,
       nomeProprietario: lead ? lead.nomeProprietario : 'N/A',
       concelhoFreguesia: lead ? lead.freguesia : 'N/A',
-      responsavel: currentUser,
-      assignedUser: currentUser,
+      responsavel: user,
+      assignedUser: user,
       realizadaEm: visitData.estado === 'Realizada' ? new Date().toISOString() : undefined
     };
 
@@ -621,10 +648,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     return newVisit;
-  };
+  }, []);
 
-  const updateVisit = (updatedVisit: Visit) => {
-    const lead = leads.find(l => l.id === updatedVisit.leadId);
+  const updateVisit = useCallback((updatedVisit: Visit) => {
+    const lead = leadsRef.current.find(l => l.id === updatedVisit.leadId);
     const finalVisit: Visit = {
       ...updatedVisit,
       nomeProprietario: lead ? lead.nomeProprietario : updatedVisit.nomeProprietario,
@@ -638,15 +665,15 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(finalVisit)
     }).catch(err => console.warn('Prisma visit update error:', err));
-  };
+  }, []);
 
-  const deleteVisit = (visitId: string) => {
+  const deleteVisit = useCallback((visitId: string) => {
     setVisits(prev => prev.filter(v => v.id !== visitId));
     fetch(`/api/visits/${visitId}`, { method: 'DELETE' }).catch(err => console.warn('Prisma visit delete error:', err));
-  };
+  }, []);
 
-  const toggleVisitRealizada = (visitId: string) => {
-    const targetVisit = visits.find(v => v.id === visitId);
+  const toggleVisitRealizada = useCallback((visitId: string) => {
+    const targetVisit = visitsRef.current.find(v => v.id === visitId);
     if (!targetVisit) return;
     const isRealizada = targetVisit.estado === 'Realizada';
     const newState = isRealizada ? 'Marcada' : 'Realizada';
@@ -668,12 +695,13 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado: newState, realizadaEm: realizadaEm || null })
     }).catch(err => console.warn('Prisma visit toggle error:', err));
-  };
+  }, []);
 
   // PROPOSAL ACTIONS
-  const addProposal = (proposalData: Omit<Proposal, 'id' | 'nomeProprietario' | 'moradaConcelhoFreguesia' | 'margemPrevista' | 'spread' | 'multiploSinal' | 'assignedUser'> & { valorSinal?: number }): Proposal => {
-    const lead = leads.find(l => l.id === proposalData.leadId);
+  const addProposal = useCallback((proposalData: Omit<Proposal, 'id' | 'nomeProprietario' | 'moradaConcelhoFreguesia' | 'margemPrevista' | 'spread' | 'multiploSinal' | 'assignedUser'> & { valorSinal?: number }): Proposal => {
+    const lead = leadsRef.current.find(l => l.id === proposalData.leadId);
     const id = 'prop-' + Date.now();
+    const user = currentUserRef.current;
 
     const margemPrevista = calcProposalMargin(proposalData.valorRevenda, proposalData.valorProposta);
     const spread = calcProposalSpread(proposalData.valorRevenda, proposalData.valorProposta);
@@ -693,7 +721,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       margemPrevista,
       spread,
       multiploSinal,
-      assignedUser: currentUser
+      assignedUser: user
     };
 
     setProposals(prev => [newProposal, ...prev]);
@@ -705,14 +733,19 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(err => console.warn('Prisma proposal create error:', err));
 
     if (lead && lead.fase === 'Nova lead') {
-      updateLeadPhase(lead.id, 'Em análise');
+      setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, fase: 'Em análise' } : l));
+      fetch(`/api/leads/${lead.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fase: 'Em análise' })
+      }).catch(err => console.warn('Prisma phase sync error:', err));
     }
 
     return newProposal;
-  };
+  }, []);
 
-  const updateProposal = (updatedProposal: Proposal) => {
-    const lead = leads.find(l => l.id === updatedProposal.leadId);
+  const updateProposal = useCallback((updatedProposal: Proposal) => {
+    const lead = leadsRef.current.find(l => l.id === updatedProposal.leadId);
     const margemPrevista = calcProposalMargin(updatedProposal.valorRevenda, updatedProposal.valorProposta);
     const spread = calcProposalSpread(updatedProposal.valorRevenda, updatedProposal.valorProposta);
     const valorSinal = updatedProposal.valorSinal > 0 ? updatedProposal.valorSinal : calcDefaultSinal(updatedProposal.valorProposta);
@@ -735,16 +768,17 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(finalProposal)
     }).catch(err => console.warn('Prisma proposal update error:', err));
-  };
+  }, []);
 
-  const deleteProposal = (proposalId: string) => {
+  const deleteProposal = useCallback((proposalId: string) => {
     setProposals(prev => prev.filter(p => p.id !== proposalId));
     fetch(`/api/proposals/${proposalId}`, { method: 'DELETE' }).catch(err => console.warn('Prisma proposal delete error:', err));
-  };
+  }, []);
 
-  const acceptProposal = (proposalId: string) => {
-    const prop = proposals.find(p => p.id === proposalId);
+  const acceptProposal = useCallback((proposalId: string) => {
+    const prop = proposalsRef.current.find(p => p.id === proposalId);
     if (!prop) return;
+    const user = currentUserRef.current;
 
     setProposals(prev => prev.map(p => p.id === proposalId ? { ...p, estado: 'Aceite' } : p));
 
@@ -755,13 +789,35 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(err => console.warn('Prisma proposal accept error:', err));
 
     if (prop.leadId) {
-      updateLeadPhase(prop.leadId, 'CPCV a preparar');
-      addNoteToLead(prop.leadId, `Proposta de ${prop.valorProposta} € aceite! Negócio encaminhado para formalização de CPCV.`);
+      setLeads(prev => prev.map(l => l.id === prop.leadId ? { ...l, fase: 'CPCV a preparar' } : l));
+      fetch(`/api/leads/${prop.leadId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fase: 'CPCV a preparar' })
+      }).catch(err => console.warn('Prisma phase sync error:', err));
+
+      const noteText = `Proposta de ${prop.valorProposta} € aceite! Negócio encaminhado para formalização de CPCV.`;
+      const newNote: Note = {
+        id: 'note-' + Date.now(),
+        author: user,
+        assignedUser: user,
+        date: new Date().toISOString(),
+        text: noteText,
+        type: 'general',
+        leadId: prop.leadId
+      };
+      setLeads(prev => prev.map(l => l.id === prop.leadId ? { ...l, notas: [newNote, ...(l.notas || [])] } : l));
+      setNotes(prev => [newNote, ...prev]);
+
+      fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newNote)
+      }).catch(err => console.warn('Prisma note create error:', err));
       
-      // Auto-create post-acceptance Deal Operation if not already created
-      const existingOp = operations.find(o => o.proposalId === proposalId || o.leadId === prop.leadId);
+      const existingOp = operationsRef.current.find(o => o.proposalId === proposalId || o.leadId === prop.leadId);
       if (!existingOp) {
-        const lead = leads.find(l => l.id === prop.leadId);
+        const lead = leadsRef.current.find(l => l.id === prop.leadId);
         const newOp: DealOperation = {
           id: 'op-' + Date.now(),
           leadId: prop.leadId,
@@ -776,7 +832,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           margemPrevista: prop.margemPrevista,
           multiploSinal: prop.multiploSinal,
           fase: 'Validacao_Facebook',
-          responsavel: currentUser,
+          responsavel: user,
           dataAceitacao: new Date().toISOString().split('T')[0],
           checklist: {
             anuncioCriadoFacebook: true,
@@ -787,8 +843,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           historicoNotas: [
             {
               id: 'on-' + Date.now(),
-              author: currentUser,
-              text: `Proposta de ${prop.valorProposta} € aceite por ${currentUser}. Negócio colocado em validação de interesse no Facebook.`,
+              author: user,
+              text: `Proposta de ${prop.valorProposta} € aceite por ${user}. Negócio colocado em validação de interesse no Facebook.`,
               date: new Date().toISOString()
             }
           ],
@@ -803,10 +859,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }).catch(err => console.warn('Prisma op create error:', err));
       }
     }
-  };
+  }, []);
 
   // OPERATIONS ACTIONS (Pós-Aceitação / Do CPCV até à Venda)
-  const addOperation = (opData: Omit<DealOperation, 'id'>): DealOperation => {
+  const addOperation = useCallback((opData: Omit<DealOperation, 'id'>): DealOperation => {
     const id = 'op-' + Date.now();
     const newOp: DealOperation = {
       ...opData,
@@ -821,18 +877,18 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(err => console.warn('Prisma op create error:', err));
 
     return newOp;
-  };
+  }, []);
 
-  const updateOperation = (updatedOp: DealOperation) => {
+  const updateOperation = useCallback((updatedOp: DealOperation) => {
     setOperations(prev => prev.map(o => o.id === updatedOp.id ? updatedOp : o));
     fetch(`/api/operations/${updatedOp.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedOp)
     }).catch(err => console.warn('Prisma op update error:', err));
-  };
+  }, []);
 
-  const updateOperationStage = (opId: string, stage: OperationStage) => {
+  const updateOperationStage = useCallback((opId: string, stage: OperationStage) => {
     let updatesPayload: Partial<DealOperation> = { fase: stage };
     setOperations(prev => prev.map(o => {
       if (o.id === opId) {
@@ -855,9 +911,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatesPayload)
     }).catch(err => console.warn('Prisma op stage update error:', err));
-  };
+  }, []);
 
-  const toggleChecklistDoc = (opId: string, docKey: keyof DocumentChecklist) => {
+  const toggleChecklistDoc = useCallback((opId: string, docKey: keyof DocumentChecklist) => {
     let newChecklist: any = null;
     setOperations(prev => prev.map(o => {
       if (o.id === opId) {
@@ -880,18 +936,19 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ checklist: newChecklist })
       }).catch(err => console.warn('Prisma op checklist toggle error:', err));
     }
-  };
+  }, []);
 
-  const deleteOperation = (opId: string) => {
+  const deleteOperation = useCallback((opId: string) => {
     setOperations(prev => prev.filter(o => o.id !== opId));
     fetch(`/api/operations/${opId}`, { method: 'DELETE' }).catch(err => console.warn('Prisma op delete error:', err));
-  };
+  }, []);
 
-  const addOperationNote = (opId: string, text: string) => {
+  const addOperationNote = useCallback((opId: string, text: string) => {
     if (!text.trim()) return;
+    const user = currentUserRef.current;
     const newNote: OperationNote = {
       id: 'on-' + Date.now(),
-      author: currentUser,
+      author: user,
       text: text.trim(),
       date: new Date().toISOString()
     };
@@ -908,106 +965,165 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetch(`/api/operations/${opId}/notes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text.trim(), author: currentUser })
+      body: JSON.stringify({ text: text.trim(), author: user })
     }).catch(err => console.warn('Prisma op note create error:', err));
-  };
+  }, []);
+
+  const contextValue = useMemo<CRMContextType>(() => ({
+    isAuthenticated,
+    currentUser,
+    setCurrentUser,
+    login,
+    logout,
+
+    activeTab,
+    setActiveTab,
+    leadViewMode,
+    setLeadViewMode,
+    globalSearch,
+    setGlobalSearch,
+
+    isLoaded,
+    leads,
+    visits,
+    proposals,
+    notes,
+    operations,
+
+    selectedLeadForDrawer,
+    setSelectedLeadForDrawer,
+    isLeadFormOpen,
+    setIsLeadFormOpen,
+    editingLead,
+    setEditingLead,
+
+    isCallModalOpen,
+    setIsCallModalOpen,
+    callModalLeadId,
+    setCallModalLeadId,
+    openCallModal,
+
+    isVisitFormOpen,
+    setIsVisitFormOpen,
+    preselectedVisitLeadId,
+    setPreselectedVisitLeadId,
+    editingVisit,
+    setEditingVisit,
+
+    isProposalFormOpen,
+    setIsProposalFormOpen,
+    preselectedProposalLeadId,
+    setPreselectedProposalLeadId,
+    editingProposal,
+    setEditingProposal,
+    viewingProposal,
+    setViewingProposal,
+    prefilledProposalData,
+    setPrefilledProposalData,
+
+    isAIModalOpen,
+    setIsAIModalOpen,
+    aiTargetLead,
+    setAITargetLead,
+    openAIAnalysis,
+
+    deleteImpactModal,
+    setDeleteImpactModal,
+
+    addLead,
+    updateLead,
+    requestDeleteLead,
+    confirmDeleteLead,
+    updateLeadPhase,
+    discardLead,
+    restoreLead,
+    addNoteToLead,
+    addCallNoteToLead,
+
+    addNote,
+    updateNote,
+    deleteNote,
+    togglePinNote,
+
+    addVisit,
+    updateVisit,
+    deleteVisit,
+    toggleVisitRealizada,
+
+    addProposal,
+    updateProposal,
+    deleteProposal,
+    acceptProposal,
+
+    addOperation,
+    updateOperation,
+    updateOperationStage,
+    toggleChecklistDoc,
+    deleteOperation,
+    addOperationNote
+  }), [
+    isAuthenticated,
+    currentUser,
+    activeTab,
+    leadViewMode,
+    globalSearch,
+    isLoaded,
+    leads,
+    visits,
+    proposals,
+    notes,
+    operations,
+    selectedLeadForDrawer,
+    isLeadFormOpen,
+    editingLead,
+    isCallModalOpen,
+    callModalLeadId,
+    isVisitFormOpen,
+    preselectedVisitLeadId,
+    editingVisit,
+    isProposalFormOpen,
+    preselectedProposalLeadId,
+    editingProposal,
+    viewingProposal,
+    prefilledProposalData,
+    isAIModalOpen,
+    aiTargetLead,
+    deleteImpactModal,
+    login,
+    logout,
+    openCallModal,
+    openAIAnalysis,
+    addLead,
+    updateLead,
+    requestDeleteLead,
+    confirmDeleteLead,
+    updateLeadPhase,
+    discardLead,
+    restoreLead,
+    addNoteToLead,
+    addCallNoteToLead,
+    addNote,
+    updateNote,
+    deleteNote,
+    togglePinNote,
+    addVisit,
+    updateVisit,
+    deleteVisit,
+    toggleVisitRealizada,
+    addProposal,
+    updateProposal,
+    deleteProposal,
+    acceptProposal,
+    addOperation,
+    updateOperation,
+    updateOperationStage,
+    toggleChecklistDoc,
+    deleteOperation,
+    addOperationNote
+  ]);
 
   return (
-    <CRMContext.Provider
-      value={{
-        isAuthenticated,
-        currentUser,
-        setCurrentUser,
-        login,
-        logout,
-
-        activeTab,
-        setActiveTab,
-        leadViewMode,
-        setLeadViewMode,
-        globalSearch,
-        setGlobalSearch,
-
-        isLoaded,
-        leads,
-        visits,
-        proposals,
-        notes,
-        operations,
-
-        selectedLeadForDrawer,
-        setSelectedLeadForDrawer,
-        isLeadFormOpen,
-        setIsLeadFormOpen,
-        editingLead,
-        setEditingLead,
-
-        isCallModalOpen,
-        setIsCallModalOpen,
-        callModalLeadId,
-        setCallModalLeadId,
-        openCallModal,
-
-        isVisitFormOpen,
-        setIsVisitFormOpen,
-        preselectedVisitLeadId,
-        setPreselectedVisitLeadId,
-        editingVisit,
-        setEditingVisit,
-
-        isProposalFormOpen,
-        setIsProposalFormOpen,
-        preselectedProposalLeadId,
-        setPreselectedProposalLeadId,
-        editingProposal,
-        setEditingProposal,
-        viewingProposal,
-        setViewingProposal,
-        prefilledProposalData,
-        setPrefilledProposalData,
-
-        isAIModalOpen,
-        setIsAIModalOpen,
-        aiTargetLead,
-        setAITargetLead,
-        openAIAnalysis,
-
-        deleteImpactModal,
-        setDeleteImpactModal,
-
-        addLead,
-        updateLead,
-        requestDeleteLead,
-        confirmDeleteLead,
-        updateLeadPhase,
-        discardLead,
-        restoreLead,
-        addNoteToLead,
-        addCallNoteToLead,
-
-        addNote,
-        updateNote,
-        deleteNote,
-        togglePinNote,
-
-        addVisit,
-        updateVisit,
-        deleteVisit,
-        toggleVisitRealizada,
-
-        addProposal,
-        updateProposal,
-        deleteProposal,
-        acceptProposal,
-
-        addOperation,
-        updateOperation,
-        updateOperationStage,
-        toggleChecklistDoc,
-        deleteOperation,
-        addOperationNote
-      }}
-    >
+    <CRMContext.Provider value={contextValue}>
       {children}
     </CRMContext.Provider>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -74,17 +74,40 @@ export const OperationsView: React.FC = () => {
   const [dataLimiteEscritura, setDataLimiteEscritura] = useState('');
   const [notasOperacao, setNotasOperacao] = useState('');
 
-  const filteredOperations = operations.filter(o => {
-    if (responsavelFilter !== 'Todos' && o.responsavel !== responsavelFilter) return false;
-    return true;
-  });
+  const filteredOperations = useMemo(() => {
+    return operations.filter(o => {
+      if (responsavelFilter !== 'Todos' && o.responsavel !== responsavelFilter) return false;
+      return true;
+    });
+  }, [operations, responsavelFilter]);
 
-  // KPI Metrics
-  const totalOperations = operations.length;
-  const sinaisTotaisPagos = operations.reduce((acc, curr) => acc + (curr.valorSinalPago || 0), 0);
-  const margemTotalProjetada = operations.reduce((acc, curr) => acc + (curr.margemPrevista || 0), 0);
-  const vendasFechadas = operations.filter(o => o.fase === 'Venda_Fechada');
-  const lucroTotalRealizado = vendasFechadas.reduce((acc, curr) => acc + (curr.lucroRealizado || curr.margemPrevista || 0), 0);
+  // KPI Metrics (Memoized)
+  const { totalOperations, sinaisTotaisPagos, margemTotalProjetada, vendasFechadas, lucroTotalRealizado } = useMemo(() => {
+    const totalOps = operations.length;
+    let sinais = 0;
+    let margem = 0;
+    const fechadas: DealOperation[] = [];
+    let lucroTot = 0;
+
+    for (let i = 0; i < operations.length; i++) {
+      const o = operations[i];
+      sinais += o.valorSinalPago || 0;
+      margem += o.margemPrevista || 0;
+      if (o.fase === 'Venda_Fechada') {
+        fechadas.push(o);
+        lucroTot += o.lucroRealizado || o.margemPrevista || 0;
+      }
+    }
+
+    return {
+      totalOperations: totalOps,
+      sinaisTotaisPagos: sinais,
+      margemTotalProjetada: margem,
+      vendasFechadas: fechadas,
+      lucroTotalRealizado: lucroTot
+    };
+  }, [operations]);
+
 
   const handleOpenEditModal = (op: DealOperation) => {
     setSelectedOperationForModal(op);
