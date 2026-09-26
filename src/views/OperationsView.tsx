@@ -17,6 +17,7 @@ import {
   Plus,
   Send,
   Share2,
+  Trash2,
   GripVertical
 } from 'lucide-react';
 import { useCRM } from '../context/CRMContext';
@@ -51,6 +52,7 @@ export const OperationsView: React.FC = () => {
     updateOperation,
     updateOperationStage,
     toggleChecklistDoc,
+    deleteOperation,
     addOperationNote,
     currentUser
   } = useCRM();
@@ -73,6 +75,17 @@ export const OperationsView: React.FC = () => {
   const [dataAssinaturaCPCV, setDataAssinaturaCPCV] = useState('');
   const [dataLimiteEscritura, setDataLimiteEscritura] = useState('');
   const [notasOperacao, setNotasOperacao] = useState('');
+
+  const handleDeleteOperation = (op: DealOperation) => {
+    const isVal = op.fase === 'Validacao_Facebook';
+    const msg = isVal
+      ? `Tem a certeza que deseja retirar e eliminar a oportunidade "${op.nomeProprietario}" da Validação de Interesse?`
+      : `Tem a certeza que deseja eliminar esta operação de "${op.nomeProprietario}"?`;
+
+    if (window.confirm(msg)) {
+      deleteOperation(op.id);
+    }
+  };
 
   const filteredOperations = useMemo(() => {
     return operations.filter(o => {
@@ -324,9 +337,21 @@ export const OperationsView: React.FC = () => {
                             </div>
                           </div>
 
-                          <span className={`w-6 h-6 text-[10px] font-black flex items-center justify-center ${userTheme.avatarBg} rounded-md shadow-2xs shrink-0 font-display`} title={`Responsável: ${userTheme.name}`}>
-                            {userTheme.initial}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteOperation(op);
+                              }}
+                              className="p-1 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                              title="Retirar negócio / Mover para o lixo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <span className={`w-6 h-6 text-[10px] font-black flex items-center justify-center ${userTheme.avatarBg} rounded-md shadow-2xs shrink-0 font-display`} title={`Responsável: ${userTheme.name}`}>
+                              {userTheme.initial}
+                            </span>
+                          </div>
                         </div>
 
                         {/* Financial terms breakdown */}
@@ -496,13 +521,24 @@ export const OperationsView: React.FC = () => {
 
                         {/* Stage Progression & Edit */}
                         <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
-                          <button
-                            onClick={() => handleOpenEditModal(op)}
-                            className="text-[10px] font-bold text-stone-600 hover:text-stone-900 underline flex items-center gap-1"
-                          >
-                            <Edit className="w-3 h-3" />
-                            <span>Editar Detalhes</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleOpenEditModal(op)}
+                              className="text-[10px] font-bold text-stone-600 hover:text-stone-900 underline flex items-center gap-1"
+                            >
+                              <Edit className="w-3 h-3" />
+                              <span>Editar Detalhes</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteOperation(op)}
+                              className="text-[10px] font-bold text-stone-400 hover:text-red-600 flex items-center gap-1 transition"
+                              title="Retirar negócio do funil operacional"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Retirar</span>
+                            </button>
+                          </div>
 
                           {/* Stage progression button */}
                           {stage.id === 'Validacao_Facebook' && (
@@ -637,20 +673,35 @@ export const OperationsView: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-200">
+              <div className="flex items-center justify-between pt-3 border-t border-stone-200">
                 <button
                   type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50 font-semibold text-xs"
+                  onClick={() => {
+                    if (selectedOperationForModal) {
+                      handleDeleteOperation(selectedOperationForModal);
+                      setIsEditModalOpen(false);
+                    }
+                  }}
+                  className="px-3 py-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg font-bold text-xs flex items-center gap-1.5 transition"
                 >
-                  Cancelar
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Retirar do Funil</span>
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-stone-900 hover:bg-black text-white rounded-lg font-bold text-xs shadow-xs"
-                >
-                  Guardar Alterações
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2 border border-stone-300 rounded-lg text-stone-600 hover:bg-stone-50 font-semibold text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-stone-900 hover:bg-black text-white rounded-lg font-bold text-xs shadow-xs"
+                  >
+                    Guardar Alterações
+                  </button>
+                </div>
               </div>
             </form>
           </div>

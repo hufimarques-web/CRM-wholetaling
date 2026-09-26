@@ -84,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       id: 'discarded',
       label: 'Descartadas',
       icon: Archive,
-      badge: counts.discardedLeads
+      badge: null
     }
   ] as const, [counts]);
 

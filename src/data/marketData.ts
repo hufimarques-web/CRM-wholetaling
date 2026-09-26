@@ -324,6 +324,94 @@ export const AVEIRO_MARKET_BENCHMARKS: ParishMarketBenchmark[] = [
     mediaMoradiaM2: 1500,
     mediaRuinaM2: 800,
     mediaTerrenoM2: 75,
+  },
+
+  // 13. CONCELHO DE OLIVEIRA DO BAIRRO
+  {
+    freguesia: 'Oiã',
+    concelho: 'Oliveira do Bairro',
+    mediaApartamentoM2: 1550,
+    mediaMoradiaM2: 1300,
+    mediaRuinaM2: 600,
+    mediaTerrenoM2: 55,
+  },
+  {
+    freguesia: 'Palhaça',
+    concelho: 'Oliveira do Bairro',
+    mediaApartamentoM2: 1400,
+    mediaMoradiaM2: 1200,
+    mediaRuinaM2: 550,
+    mediaTerrenoM2: 45,
+  },
+  {
+    freguesia: 'Oliveira do Bairro (Centro)',
+    concelho: 'Oliveira do Bairro',
+    mediaApartamentoM2: 1600,
+    mediaMoradiaM2: 1350,
+    mediaRuinaM2: 650,
+    mediaTerrenoM2: 60,
+  },
+  {
+    freguesia: 'Bustos',
+    concelho: 'Oliveira do Bairro',
+    mediaApartamentoM2: 1350,
+    mediaMoradiaM2: 1150,
+    mediaRuinaM2: 500,
+    mediaTerrenoM2: 40,
+  },
+  {
+    freguesia: 'Troviscal',
+    concelho: 'Oliveira do Bairro',
+    mediaApartamentoM2: 1300,
+    mediaMoradiaM2: 1100,
+    mediaRuinaM2: 480,
+    mediaTerrenoM2: 38,
+  },
+  {
+    freguesia: 'Mamarrosa',
+    concelho: 'Oliveira do Bairro',
+    mediaApartamentoM2: 1250,
+    mediaMoradiaM2: 1050,
+    mediaRuinaM2: 460,
+    mediaTerrenoM2: 35,
+  },
+
+  // 14. CONCELHO DA MURTOSA
+  {
+    freguesia: 'Murtosa (Centro)',
+    concelho: 'Murtosa',
+    mediaApartamentoM2: 1400,
+    mediaMoradiaM2: 1250,
+    mediaRuinaM2: 600,
+    mediaTerrenoM2: 50,
+  },
+  {
+    freguesia: 'Torreira (Ria e Praia)',
+    concelho: 'Murtosa',
+    mediaApartamentoM2: 1850,
+    mediaMoradiaM2: 1600,
+    mediaRuinaM2: 850,
+    mediaTerrenoM2: 90,
+  },
+
+  // 15. CONCELHO DE SEVER DO VOUGA
+  {
+    freguesia: 'Sever do Vouga',
+    concelho: 'Sever do Vouga',
+    mediaApartamentoM2: 1300,
+    mediaMoradiaM2: 1150,
+    mediaRuinaM2: 520,
+    mediaTerrenoM2: 40,
+  },
+
+  // 16. CONCELHO DA MEALHADA
+  {
+    freguesia: 'Mealhada, Ventosa do Bairro e Antes',
+    concelho: 'Mealhada',
+    mediaApartamentoM2: 1450,
+    mediaMoradiaM2: 1250,
+    mediaRuinaM2: 600,
+    mediaTerrenoM2: 50,
   }
 ];
 
@@ -343,10 +431,11 @@ export const AVEIRO_DISTRICT_AVERAGE_M2: Record<PropertyType, number> = {
 export const getAveiroParishBenchmarkM2 = (freguesiaName: string, propertyType: PropertyType = 'Moradia'): number => {
   if (!freguesiaName) return AVEIRO_DISTRICT_AVERAGE_M2[propertyType] || 1500;
   
-  const found = AVEIRO_MARKET_BENCHMARKS.find(b =>
-    freguesiaName.toLowerCase().includes(b.freguesia.toLowerCase()) ||
-    b.freguesia.toLowerCase().includes(freguesiaName.toLowerCase())
-  );
+  const normTarget = freguesiaName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const found = AVEIRO_MARKET_BENCHMARKS.find(b => {
+    const normBench = b.freguesia.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return normTarget.includes(normBench) || normBench.includes(normTarget);
+  });
 
   if (!found) {
     return AVEIRO_DISTRICT_AVERAGE_M2[propertyType] || 1500;
