@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { PhoneCall, Edit, Trash2, Calendar, MapPin, Sparkles, Building, ChevronLeft, ChevronRight, ArrowRightLeft, Archive } from 'lucide-react';
 import { useCRM } from '../../context/CRMContext';
 import { Lead, LeadPhase } from '../../types/crm';
-import { formatCurrency, getContactStatusBadge, getUserTheme } from '../../utils/formatters';
+import { formatCurrency, getContactStatusBadge, getUserTheme, getBusinessModelBadge } from '../../utils/formatters';
 
 const FUNNEL_PHASES: { id: LeadPhase; label: string }[] = [
   { id: 'Nova lead', label: 'NOVA LEAD' },
@@ -278,6 +278,20 @@ export const FunnelBoard: React.FC<FunnelBoardProps> = ({ filteredLeads }) => {
                               </span>
                             )}
                           </div>
+
+                          {/* Business Model Tag if not Wholetailing */}
+                          {lead.modeloNegocio && lead.modeloNegocio !== 'Wholetailing' && (
+                            <div className="flex items-center gap-1.5">
+                              <span className={`px-2 py-0.5 text-[9px] rounded-md font-bold border ${getBusinessModelBadge(lead.modeloNegocio).bg} ${getBusinessModelBadge(lead.modeloNegocio).text} ${getBusinessModelBadge(lead.modeloNegocio).border}`}>
+                                {lead.modeloNegocio}
+                              </span>
+                              {lead.modeloNegocio === 'Mediação' && lead.mediacaoFase === 'Contrato_Aceite' && (
+                                <span className="px-1.5 py-0.2 text-[8px] font-black uppercase rounded bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                  Venda Ativa
+                                </span>
+                              )}
+                            </div>
+                          )}
 
                           {/* Values Line (Price & Margin) */}
                           <div className="flex items-center justify-between pt-1 border-t border-stone-100 text-xs">

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { PhoneCall, Edit, Trash2, Calendar, Sparkles, ArrowUpDown } from 'lucide-react';
 import { useCRM } from '../../context/CRMContext';
 import { Lead, LeadPhase } from '../../types/crm';
-import { formatCurrency, formatDatePT, getContactStatusBadge, getPhaseBadge, getUserTheme } from '../../utils/formatters';
+import { formatCurrency, formatDatePT, getContactStatusBadge, getPhaseBadge, getUserTheme, getBusinessModelBadge } from '../../utils/formatters';
 
 interface LeadsTableProps {
   filteredLeads: Lead[];
@@ -150,6 +150,13 @@ export const LeadsTable: React.FC<LeadsTableProps> = ({ filteredLeads, faseFilte
                       <div>
                         <span className="block hover:text-amber-800 transition">{lead.nomeProprietario}</span>
                         <span className="text-[11px] text-stone-400 font-normal">{lead.telefone}</span>
+                        {lead.modeloNegocio && lead.modeloNegocio !== 'Wholetailing' && (
+                          <div className="mt-0.5">
+                            <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold border ${getBusinessModelBadge(lead.modeloNegocio).bg} ${getBusinessModelBadge(lead.modeloNegocio).text} ${getBusinessModelBadge(lead.modeloNegocio).border}`}>
+                              {lead.modeloNegocio}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </td>
 

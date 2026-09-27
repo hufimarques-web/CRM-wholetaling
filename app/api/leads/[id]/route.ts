@@ -39,10 +39,26 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (body.assignedTo !== undefined) dataToUpdate.assignedTo = body.assignedTo;
     if (body.isDemo !== undefined) dataToUpdate.isDemo = body.isDemo || false;
 
+    // Requalificação & Mediação
+    if (body.modeloNegocio !== undefined) dataToUpdate.modeloNegocio = body.modeloNegocio;
+    if (body.requalificacaoNotas !== undefined) dataToUpdate.requalificacaoNotas = body.requalificacaoNotas;
+    if (body.mediacaoFase !== undefined) dataToUpdate.mediacaoFase = body.mediacaoFase;
+    if (body.mediacaoPrecoVenda !== undefined) {
+      dataToUpdate.mediacaoPrecoVenda = body.mediacaoPrecoVenda !== null && !isNaN(Number(body.mediacaoPrecoVenda)) ? Number(body.mediacaoPrecoVenda) : null;
+    }
+    if (body.mediacaoComissaoPercent !== undefined) {
+      dataToUpdate.mediacaoComissaoPercent = body.mediacaoComissaoPercent !== null && !isNaN(Number(body.mediacaoComissaoPercent)) ? Number(body.mediacaoComissaoPercent) : 5.0;
+    }
+    if (body.mediacaoTipoContrato !== undefined) dataToUpdate.mediacaoTipoContrato = body.mediacaoTipoContrato;
+    if (body.mediacaoNotas !== undefined) dataToUpdate.mediacaoNotas = body.mediacaoNotas;
+
     const updated = await prisma.lead.update({
       where: { id: params.id },
       data: dataToUpdate,
-      include: { notas: true }
+      include: {
+        notas: true,
+        buyers: true
+      }
     });
     return NextResponse.json(updated);
   } catch (error: any) {

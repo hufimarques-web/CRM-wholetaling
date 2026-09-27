@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Lead, Visit, Proposal, LeadPhase, ContactStatus, Note, CallResult, AppUser, DealOperation, OperationStage, DocumentChecklist, OperationNote } from '../types/crm';
+import {
+  Lead, Visit, Proposal, LeadPhase, ContactStatus, Note, CallResult, AppUser,
+  DealOperation, OperationStage, DocumentChecklist, OperationNote,
+  BusinessModel, MediationPhase, MediationBuyer, MediationBuyerStage
+} from '../types/crm';
 import { INITIAL_LEADS, INITIAL_VISITS, INITIAL_PROPOSALS, INITIAL_NOTES, INITIAL_OPERATIONS } from '../data/initialData';
 import { analyzeLeadMarket } from '../data/marketData';
 import { calcLeadPotentialMargin, calcProposalMargin, calcProposalSpread, calcDefaultSinal, calcProposalMultiple } from '../utils/formatters';
@@ -27,8 +31,8 @@ interface CRMContextType {
   logout: () => void;
 
   // Navigation & Search
-  activeTab: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded';
-  setActiveTab: (tab: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded') => void;
+  activeTab: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded' | 'mediacao_pipeline' | 'mediacao_gestao';
+  setActiveTab: (tab: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded' | 'mediacao_pipeline' | 'mediacao_gestao') => void;
   leadViewMode: 'funnel' | 'table';
   setLeadViewMode: (mode: 'funnel' | 'table') => void;
   globalSearch: string;
@@ -124,6 +128,21 @@ interface CRMContextType {
   toggleChecklistDoc: (opId: string, docKey: keyof DocumentChecklist) => void;
   deleteOperation: (opId: string) => void;
   addOperationNote: (opId: string, text: string) => void;
+
+  // Mediação & Requalificação Actions
+  updateMediationPhase: (leadId: string, phase: MediationPhase) => void;
+  requalifyLead: (leadId: string, modelo: BusinessModel, requalificacaoNotas?: string, extraParams?: Partial<Lead>) => void;
+  
+  // Mediação Buyers / Interessados Actions
+  addMediationBuyer: (buyerData: Omit<MediationBuyer, 'id' | 'createdAt' | 'updatedAt'>) => Promise<MediationBuyer>;
+  updateMediationBuyer: (buyer: MediationBuyer) => Promise<void>;
+  updateMediationBuyerStage: (buyerId: string, leadId: string, stage: MediationBuyerStage) => Promise<void>;
+  deleteMediationBuyer: (buyerId: string, leadId: string) => Promise<void>;
+
+  // Mini CRM do Imóvel Modal Trigger
+  selectedPropertyForMediation: Lead | null;
+  setSelectedPropertyForMediation: (lead: Lead | null) => void;
+  openPropertyMediationCRM: (lead: Lead) => void;
 }
 
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
@@ -190,9 +209,15 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Navigation & Search
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded'>('leads');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded' | 'mediacao_pipeline' | 'mediacao_gestao'>('leads');
   const [leadViewMode, setLeadViewMode] = useState<'funnel' | 'table'>('funnel');
   const [globalSearch, setGlobalSearch] = useState('');
+
+  // Mini CRM do Imóvel (Mediação)
+  const [selectedPropertyForMediation, setSelectedPropertyForMediation] = useState<Lead | null>(null);
+  const openPropertyMediationCRM = useCallback((lead: Lead) => {
+    setSelectedPropertyForMediation(lead);
+  }, []);
 
   // Database is Single Source of Truth
   const [isLoaded, setIsLoaded] = useState<boolean>(true);
@@ -397,10 +422,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...updatedLead,
       precoM2,
       margemPotencial,
-      deltaMercadoPercent: undefined,
-      etiquetaMercado: undefined,
-      ratingMercado: undefined,
-      mediaFreguesiaM2: undefined
+      deltaMercadoPercent: updatedLead.deltaMercadoPercent,
+      etiquetaMercado: updatedLead.etiquetaMercado,
+      ratingMercado: updatedLead.ratingMercado,
+      mediaFreguesiaM2: updatedLead.mediaFreguesiaM2
     };
 
     setLeads(prev => prev.map(l => l.id === finalLead.id ? finalLead : l));
@@ -419,6 +444,187 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fase: newPhase })
     }).catch(err => console.warn('Prisma phase sync error:', err));
+  }, []);
+
+  // -------------------------------------------------------------
+  // MEDIAÇÃO & REQUALIFICAÇÃO ACTIONS
+  // -------------------------------------------------------------
+  const updateMediationPhase = useCallback((leadId: string, phase: MediationPhase) => {
+    const isDiscarding = phase === 'Descartado';
+    setLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        return {
+          ...l,
+          mediacaoFase: phase,
+          ...(isDiscarding ? { fase: 'Descartada' as LeadPhase } : {})
+        };
+      }
+      return l;
+    }));
+
+    const updatePayload: any = { mediacaoFase: phase };
+    if (isDiscarding) {
+      updatePayload.fase = 'Descartada';
+    }
+
+    fetch(`/api/leads/${leadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatePayload)
+    }).catch(err => console.warn('Prisma mediacaoFase sync error:', err));
+  }, []);
+
+  const requalifyLead = useCallback((leadId: string, modelo: BusinessModel, requalificacaoNotas?: string, extraParams?: Partial<Lead>) => {
+    const isDeactivated = modelo === 'Desativada';
+    setLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        const updated: Lead = {
+          ...l,
+          ...extraParams,
+          modeloNegocio: modelo,
+          ...(isDeactivated ? { fase: 'Descartada' as LeadPhase } : {}),
+          requalificacaoNotas: requalificacaoNotas !== undefined ? requalificacaoNotas : l.requalificacaoNotas,
+          mediacaoFase: (modelo === 'Mediação' && !l.mediacaoFase) ? 'Analise_Selecao' : (extraParams?.mediacaoFase || l.mediacaoFase || 'Analise_Selecao'),
+          mediacaoComissaoPercent: extraParams?.mediacaoComissaoPercent ?? l.mediacaoComissaoPercent ?? 2.8,
+          mediacaoPrecoVenda: extraParams?.mediacaoPrecoVenda ?? l.mediacaoPrecoVenda ?? l.valorMinimoAbsoluto
+        };
+        return updated;
+      }
+      return l;
+    }));
+
+    const payload: any = {
+      modeloNegocio: modelo,
+      ...(isDeactivated ? { fase: 'Descartada' } : {}),
+      ...(requalificacaoNotas !== undefined ? { requalificacaoNotas } : {}),
+      ...(extraParams || {})
+    };
+    if (modelo === 'Mediação') {
+      if (!payload.mediacaoFase) payload.mediacaoFase = 'Analise_Selecao';
+      if (!payload.mediacaoComissaoPercent) payload.mediacaoComissaoPercent = 2.8;
+    }
+
+    fetch(`/api/leads/${leadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(err => console.warn('Prisma requalify sync error:', err));
+  }, []);
+
+  // -------------------------------------------------------------
+  // MEDIAÇÃO BUYERS / INTERESSADOS CRUD
+  // -------------------------------------------------------------
+  const addMediationBuyer = useCallback(async (buyerData: Omit<MediationBuyer, 'id' | 'createdAt' | 'updatedAt'>): Promise<MediationBuyer> => {
+    const tempId = `buyer-${Date.now()}`;
+    const newBuyer: MediationBuyer = {
+      ...buyerData,
+      id: tempId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setLeads(prev => prev.map(l => {
+      if (l.id === buyerData.leadId) {
+        return {
+          ...l,
+          buyers: [newBuyer, ...(l.buyers || [])]
+        };
+      }
+      return l;
+    }));
+
+    try {
+      const res = await fetch('/api/buyers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newBuyer)
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setLeads(prev => prev.map(l => {
+          if (l.id === buyerData.leadId) {
+            return {
+              ...l,
+              buyers: (l.buyers || []).map(b => b.id === tempId ? saved : b)
+            };
+          }
+          return l;
+        }));
+        return saved;
+      }
+    } catch (err) {
+      console.warn('Prisma add buyer error:', err);
+    }
+    return newBuyer;
+  }, []);
+
+  const updateMediationBuyer = useCallback(async (buyer: MediationBuyer) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id === buyer.leadId) {
+        return {
+          ...l,
+          buyers: (l.buyers || []).map(b => b.id === buyer.id ? buyer : b)
+        };
+      }
+      return l;
+    }));
+
+    try {
+      await fetch('/api/buyers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buyer)
+      });
+    } catch (err) {
+      console.warn('Prisma update buyer error:', err);
+    }
+  }, []);
+
+  const updateMediationBuyerStage = useCallback(async (buyerId: string, leadId: string, stage: MediationBuyerStage) => {
+    let targetBuyer: MediationBuyer | undefined;
+    setLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        const updatedBuyers = (l.buyers || []).map(b => {
+          if (b.id === buyerId) {
+            targetBuyer = { ...b, fase: stage };
+            return targetBuyer;
+          }
+          return b;
+        });
+        return { ...l, buyers: updatedBuyers };
+      }
+      return l;
+    }));
+
+    if (targetBuyer) {
+      try {
+        await fetch('/api/buyers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(targetBuyer)
+        });
+      } catch (err) {
+        console.warn('Prisma update buyer stage error:', err);
+      }
+    }
+  }, []);
+
+  const deleteMediationBuyer = useCallback(async (buyerId: string, leadId: string) => {
+    setLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        return {
+          ...l,
+          buyers: (l.buyers || []).filter(b => b.id !== buyerId)
+        };
+      }
+      return l;
+    }));
+
+    try {
+      await fetch(`/api/buyers?id=${buyerId}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Prisma delete buyer error:', err);
+    }
   }, []);
 
   const addNoteToLead = useCallback((leadId: string, text: string) => {
@@ -468,8 +674,27 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [addNoteToLead, updateLeadPhase]);
 
   const restoreLead = useCallback((leadId: string, targetPhase: LeadPhase = 'Nova lead') => {
-    updateLeadPhase(leadId, targetPhase);
-  }, [updateLeadPhase]);
+    setLeads(prev => prev.map(l => {
+      if (l.id === leadId) {
+        return {
+          ...l,
+          fase: targetPhase,
+          modeloNegocio: l.modeloNegocio === 'Desativada' ? 'Wholetailing' : l.modeloNegocio,
+          mediacaoFase: l.modeloNegocio === 'Mediação' ? 'Analise_Selecao' : l.mediacaoFase
+        };
+      }
+      return l;
+    }));
+
+    fetch(`/api/leads/${leadId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fase: targetPhase,
+        mediacaoFase: 'Analise_Selecao'
+      })
+    }).catch(err => console.warn('Prisma restore lead sync error:', err));
+  }, []);
 
   const addCallNoteToLead = useCallback(({ leadId, text, callResult, date, nextContactDate }: AddCallNoteParams) => {
     if (!text.trim()) return;
@@ -1060,7 +1285,18 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateOperationStage,
     toggleChecklistDoc,
     deleteOperation,
-    addOperationNote
+    addOperationNote,
+
+    // Mediação & Requalificação
+    updateMediationPhase,
+    requalifyLead,
+    addMediationBuyer,
+    updateMediationBuyer,
+    updateMediationBuyerStage,
+    deleteMediationBuyer,
+    selectedPropertyForMediation,
+    setSelectedPropertyForMediation,
+    openPropertyMediationCRM
   }), [
     isAuthenticated,
     currentUser,
@@ -1119,7 +1355,15 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateOperationStage,
     toggleChecklistDoc,
     deleteOperation,
-    addOperationNote
+    addOperationNote,
+    updateMediationPhase,
+    requalifyLead,
+    addMediationBuyer,
+    updateMediationBuyer,
+    updateMediationBuyerStage,
+    deleteMediationBuyer,
+    selectedPropertyForMediation,
+    openPropertyMediationCRM
   ]);
 
   return (

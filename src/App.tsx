@@ -9,6 +9,8 @@ import { ProposalsView } from './views/ProposalsView';
 import { NotesView } from './views/NotesView';
 import { OperationsView } from './views/OperationsView';
 import { DiscardedView } from './views/DiscardedView';
+import { MediationPipelineView } from './views/MediationPipelineView';
+import { MediationManagementView } from './views/MediationManagementView';
 import { LoginView } from './views/LoginView';
 import { LeadFormModal } from './components/leads/LeadFormModal';
 import { LeadDetailDrawer } from './components/leads/LeadDetailDrawer';
@@ -18,6 +20,7 @@ import { ProposalFormModal } from './components/proposals/ProposalFormModal';
 import { ProposalDetailModal } from './components/proposals/ProposalDetailModal';
 import { DeleteConfirmModal } from './components/common/DeleteConfirmModal';
 import { AIDealModal } from './components/common/AIDealModal';
+import { PropertyMediationCRMModal } from './components/mediation/PropertyMediationCRMModal';
 
 const AppContent: React.FC = () => {
   const { activeTab, isAuthenticated } = useCRM();
@@ -47,6 +50,8 @@ const AppContent: React.FC = () => {
         <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto">
           {activeTab === 'dashboard' && <DashboardView />}
           {activeTab === 'leads' && <LeadsView />}
+          {activeTab === 'mediacao_pipeline' && <MediationPipelineView />}
+          {activeTab === 'mediacao_gestao' && <MediationManagementView />}
           {activeTab === 'notes' && <NotesView />}
           {activeTab === 'calendar' && <CalendarView />}
           {activeTab === 'proposals' && <ProposalsView />}
@@ -64,6 +69,7 @@ const AppContent: React.FC = () => {
       <ProposalDetailModal />
       <AIDealModal />
       <DeleteConfirmModal />
+      <PropertyMediationCRMModal />
 
     </div>
   );

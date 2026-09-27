@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Sparkles, MapPin, User, ShieldCheck } from 'lucide-react';
 import { useCRM } from '../../context/CRMContext';
-import { PropertyType, PropertyCondition, LeadOrigin, ContactStatus, PhotoStatus, LeadPhase, PriorityLevel, YesNo, DealDeadline } from '../../types/crm';
-import { formatCurrency, getUserTheme } from '../../utils/formatters';
+import { PropertyType, PropertyCondition, LeadOrigin, ContactStatus, PhotoStatus, LeadPhase, PriorityLevel, YesNo, DealDeadline, BusinessModel } from '../../types/crm';
+import { formatCurrency, getUserTheme, getBusinessModelBadge } from '../../utils/formatters';
 import { AVEIRO_MARKET_BENCHMARKS, analyzeLeadMarket } from '../../data/marketData';
 
 export const LeadFormModal: React.FC = () => {
@@ -28,6 +28,13 @@ export const LeadFormModal: React.FC = () => {
   const [prioridade, setPrioridade] = useState<PriorityLevel>('Alta');
   const [notaInicial, setNotaInicial] = useState('');
 
+  // Requalification & Mediação
+  const [modeloNegocio, setModeloNegocio] = useState<BusinessModel>('Wholetailing');
+  const [mediacaoPrecoVenda, setMediacaoPrecoVenda] = useState<string>('');
+  const [mediacaoComissaoPercent, setMediacaoComissaoPercent] = useState<string>('2.8');
+  const [mediacaoTipoContrato, setMediacaoTipoContrato] = useState<'Sem Exclusividade' | 'Com Exclusividade'>('Sem Exclusividade');
+  const [requalificacaoNotas, setRequalificacaoNotas] = useState<string>('');
+
   // Validation Error State
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -51,6 +58,13 @@ export const LeadFormModal: React.FC = () => {
       setFase(editingLead.fase || 'Nova lead');
       setPrioridade(editingLead.prioridade || 'Alta');
       setNotaInicial('');
+
+      // Mediação
+      setModeloNegocio(editingLead.modeloNegocio || 'Wholetailing');
+      setMediacaoPrecoVenda(editingLead.mediacaoPrecoVenda ? String(editingLead.mediacaoPrecoVenda) : '');
+      setMediacaoComissaoPercent(editingLead.mediacaoComissaoPercent ? String(editingLead.mediacaoComissaoPercent) : '2.8');
+      setMediacaoTipoContrato(editingLead.mediacaoTipoContrato || 'Sem Exclusividade');
+      setRequalificacaoNotas(editingLead.requalificacaoNotas || '');
     } else {
       setNomeProprietario('');
       setTelefone('');
@@ -69,6 +83,13 @@ export const LeadFormModal: React.FC = () => {
       setFase('Nova lead');
       setPrioridade('Alta');
       setNotaInicial('');
+
+      // Mediação Default
+      setModeloNegocio('Wholetailing');
+      setMediacaoPrecoVenda('');
+      setMediacaoComissaoPercent('2.8');
+      setMediacaoTipoContrato('Sem Exclusividade');
+      setRequalificacaoNotas('');
     }
     setErrors({});
   }, [editingLead, isLeadFormOpen]);
@@ -115,7 +136,14 @@ export const LeadFormModal: React.FC = () => {
         fotos,
         fase,
         prioridade,
-        assignedTo: editingLead.assignedTo || currentUser
+        assignedTo: editingLead.assignedTo || currentUser,
+
+        // Mediação & Requalificação
+        modeloNegocio,
+        mediacaoPrecoVenda: mediacaoPrecoVenda ? Number(mediacaoPrecoVenda) : numMinimo,
+        mediacaoComissaoPercent: Number(mediacaoComissaoPercent) || 2.8,
+        mediacaoTipoContrato,
+        requalificacaoNotas: requalificacaoNotas.trim() || undefined
       });
     } else {
       const initialNotes = notaInicial.trim()
@@ -144,7 +172,14 @@ export const LeadFormModal: React.FC = () => {
         fotos,
         fase,
         prioridade,
-        notas: initialNotes
+        notas: initialNotes,
+
+        // Mediação & Requalificação
+        modeloNegocio,
+        mediacaoPrecoVenda: mediacaoPrecoVenda ? Number(mediacaoPrecoVenda) : numMinimo,
+        mediacaoComissaoPercent: Number(mediacaoComissaoPercent) || 2.8,
+        mediacaoTipoContrato,
+        requalificacaoNotas: requalificacaoNotas.trim() || undefined
       });
     }
 
@@ -422,6 +457,110 @@ export const LeadFormModal: React.FC = () => {
                 </p>
               )}
             </div>
+          </div>
+
+          {/* Section 4: Estratégia & Modelo de Negócio */}
+          <div className="space-y-3 pt-1">
+            <h4 className="font-bold text-stone-900 uppercase tracking-wider text-[11px] border-b border-stone-200 pb-1">
+              4. Estratégia de Saída & Modelo de Negócio
+            </h4>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setModeloNegocio('Wholetailing')}
+                className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                  modeloNegocio === 'Wholetailing'
+                    ? 'border-amber-500 bg-amber-50 text-stone-900 font-bold ring-2 ring-amber-400/40'
+                    : 'border-stone-200 bg-white hover:bg-stone-50 text-stone-600'
+                }`}
+              >
+                <span className="text-xs">Wholetailing</span>
+                <span className="text-[10px] text-stone-400 font-normal">Compra base direta</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModeloNegocio('Wholesaling')}
+                className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                  modeloNegocio === 'Wholesaling'
+                    ? 'border-purple-500 bg-purple-50 text-stone-900 font-bold ring-2 ring-purple-400/40'
+                    : 'border-stone-200 bg-white hover:bg-stone-50 text-stone-600'
+                }`}
+              >
+                <span className="text-xs">Wholesaling</span>
+                <span className="text-[10px] text-stone-400 font-normal">Para investidores</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModeloNegocio('Mediação')}
+                className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                  modeloNegocio === 'Mediação'
+                    ? 'border-emerald-500 bg-emerald-50 text-stone-900 font-bold ring-2 ring-emerald-400/40'
+                    : 'border-stone-200 bg-white hover:bg-stone-50 text-stone-600'
+                }`}
+              >
+                <span className="text-xs">Mediação</span>
+                <span className="text-[10px] text-stone-400 font-normal">Angariação / venda</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setModeloNegocio('Desativada')}
+                className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                  modeloNegocio === 'Desativada'
+                    ? 'border-stone-500 bg-stone-100 text-stone-900 font-bold ring-2 ring-stone-400/40'
+                    : 'border-stone-200 bg-white hover:bg-stone-50 text-stone-600'
+                }`}
+              >
+                <span className="text-xs">Desativada</span>
+                <span className="text-[10px] text-stone-400 font-normal">Fora de critérios</span>
+              </button>
+            </div>
+
+            {/* Mediação Extra Fields */}
+            {modeloNegocio === 'Mediação' && (
+              <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-300 space-y-2.5 text-xs animate-in fade-in duration-150">
+                <span className="text-[10px] font-black uppercase text-emerald-900 tracking-wider block">
+                  Definições Iniciais de Mediação
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-900 uppercase mb-0.5">Preço Venda (€)</label>
+                    <input
+                      type="number"
+                      value={mediacaoPrecoVenda}
+                      onChange={e => setMediacaoPrecoVenda(e.target.value)}
+                      placeholder={valorMinimoAbsoluto || 'Ex: 180000'}
+                      className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-900 uppercase mb-0.5">Comissão (% IVA incl.)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={mediacaoComissaoPercent}
+                      onChange={e => setMediacaoComissaoPercent(e.target.value)}
+                      placeholder="2.8"
+                      className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-900 uppercase mb-0.5">Tipo Contrato</label>
+                    <select
+                      value={mediacaoTipoContrato}
+                      onChange={e => setMediacaoTipoContrato(e.target.value as any)}
+                      className="w-full px-2 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-semibold"
+                    >
+                      <option value="Sem Exclusividade">Sem Exclusividade</option>
+                      <option value="Com Exclusividade">Com Exclusividade</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Optional Initial Note */}

@@ -42,6 +42,39 @@ export interface Note {
   pinned?: boolean;
 }
 
+// -------------------------------------------------------------
+// REQUALIFICAÇÃO & MODELO DE NEGÓCIO (Wholetailing vs Wholesaling vs Mediação)
+// -------------------------------------------------------------
+export type BusinessModel = 'Wholetailing' | 'Wholesaling' | 'Mediação' | 'Desativada';
+
+export type MediationPhase =
+  | 'Analise_Selecao'
+  | 'Proposta_Apresentada'
+  | 'Em_Negociacao'
+  | 'Contrato_Aceite'
+  | 'Descartado';
+
+export type MediationBuyerStage =
+  | 'Interessado'
+  | 'Visita'
+  | 'Proposta'
+  | 'Fechado'
+  | 'Descartado';
+
+export interface MediationBuyer {
+  id: string;
+  leadId: string;
+  nome: string;
+  telefone: string;
+  email?: string;
+  fase: MediationBuyerStage;
+  valorOferta?: number;
+  notas?: string;
+  dataContato: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Lead {
   id: string;
   // Owner / Contact
@@ -78,6 +111,18 @@ export interface Lead {
   fotos: PhotoStatus;
   fase: LeadPhase;
   prioridade: PriorityLevel;
+
+  // Requalification & Business Model
+  modeloNegocio?: BusinessModel; // Default: 'Wholetailing'
+  requalificacaoNotas?: string;
+
+  // Mediação Specs
+  mediacaoFase?: MediationPhase; // Default: 'Analise_Selecao'
+  mediacaoPrecoVenda?: number; // Preço anunciado para venda
+  mediacaoComissaoPercent?: number; // Ex: 2.8% (default 2.8 IVA incluído)
+  mediacaoTipoContrato?: 'Sem Exclusividade' | 'Com Exclusividade';
+  mediacaoNotas?: string;
+  buyers?: MediationBuyer[];
 
   // User Assignment (Locked to active session user upon creation)
   assignedTo: AppUser;

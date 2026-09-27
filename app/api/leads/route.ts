@@ -7,7 +7,10 @@ export const revalidate = 0;
 export async function GET() {
   try {
     const leads = await prisma.lead.findMany({
-      include: { notas: true },
+      include: {
+        notas: { orderBy: { createdAt: 'desc' } },
+        buyers: { orderBy: { createdAt: 'desc' } }
+      },
       orderBy: { createdAt: 'desc' }
     });
     return NextResponse.json(leads);
@@ -46,7 +49,16 @@ export async function POST(req: Request) {
       prioridade: body.prioridade || 'Média',
       assignedTo: body.assignedTo || 'Queirós',
       dataEntrada: body.dataEntrada || new Date().toISOString().split('T')[0],
-      isDemo: body.isDemo || false
+      isDemo: body.isDemo || false,
+
+      // Requalificação & Mediação
+      modeloNegocio: body.modeloNegocio || 'Wholetailing',
+      requalificacaoNotas: body.requalificacaoNotas || null,
+      mediacaoFase: body.mediacaoFase || 'Analise_Selecao',
+      mediacaoPrecoVenda: body.mediacaoPrecoVenda !== null && !isNaN(Number(body.mediacaoPrecoVenda)) ? Number(body.mediacaoPrecoVenda) : null,
+      mediacaoComissaoPercent: body.mediacaoComissaoPercent !== null && !isNaN(Number(body.mediacaoComissaoPercent)) ? Number(body.mediacaoComissaoPercent) : 5.0,
+      mediacaoTipoContrato: body.mediacaoTipoContrato || 'Sem Exclusividade',
+      mediacaoNotas: body.mediacaoNotas || null
     };
 
     const created = await prisma.lead.upsert({
@@ -56,7 +68,10 @@ export async function POST(req: Request) {
         ...leadData
       },
       update: leadData,
-      include: { notas: true }
+      include: {
+        notas: true,
+        buyers: true
+      }
     });
     return NextResponse.json(created);
   } catch (error: any) {

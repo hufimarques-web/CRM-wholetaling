@@ -33,10 +33,10 @@ export const DiscardedView: React.FC = () => {
   const [selectedFreguesiaFilter, setSelectedFreguesiaFilter] = useState('Todas');
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
-  // Filter only discarded leads
+  // Filter only discarded leads (Wholetailing, Mediação descartada ou Desativada)
   const discardedLeads = useMemo(() => {
     return leads
-      .filter(l => l.fase === 'Descartada')
+      .filter(l => l.fase === 'Descartada' || l.modeloNegocio === 'Desativada' || l.mediacaoFase === 'Descartado')
       .sort((a, b) => {
         const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -211,6 +211,16 @@ export const DiscardedView: React.FC = () => {
                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase tracking-wider">
                           Descartada
                         </span>
+                        {lead.modeloNegocio === 'Mediação' && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 text-amber-900 border border-amber-300 uppercase tracking-wider">
+                            Mediação
+                          </span>
+                        )}
+                        {lead.modeloNegocio === 'Desativada' && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-stone-100 text-stone-700 border border-stone-300 uppercase tracking-wider">
+                            Desativada
+                          </span>
+                        )}
                         {/* Assigned User */}
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold border ${userTheme.badgeBg} ${userTheme.badgeText} ${userTheme.badgeBorder}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${userTheme.dot}`}></span>

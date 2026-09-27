@@ -38,10 +38,20 @@ model Lead {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
+  // Requalificação / Modelo de Negócio
+  modeloNegocio           String   @default("Wholetailing")
+  requalificacaoNotas     String?
+  mediacaoFase            String?  @default("Analise_Selecao")
+  mediacaoPrecoVenda      Float?
+  mediacaoComissaoPercent Float?   @default(2.8)
+  mediacaoTipoContrato    String?  @default("Sem Exclusividade")
+  mediacaoNotas           String?
+
   notas      Note[]
   visits     Visit[]
   proposals  Proposal[]
   operations DealOperation[]
+  buyers     MediationBuyer[]
 }
 
 model Visit {
@@ -147,3 +157,20 @@ model OperationNote {
 
   operation DealOperation @relation(fields: [operationId], references: [id], onDelete: Cascade)
 }
+
+model MediationBuyer {
+  id          String   @id @default(uuid())
+  leadId      String
+  nome        String
+  telefone    String
+  email       String?
+  fase        String   @default("Interessado")
+  valorOferta Float?
+  notas       String?
+  dataContato String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+

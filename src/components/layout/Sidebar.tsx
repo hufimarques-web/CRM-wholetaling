@@ -6,6 +6,7 @@ import {
   FileText,
   StickyNote,
   Building2,
+  Users,
   X,
   ShieldCheck,
   Archive,
@@ -35,12 +36,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
   const userTheme = getUserTheme(currentUser);
 
   const counts = useMemo(() => ({
-    activeLeads: leads.filter(l => l.fase !== 'Descartada').length,
+    activeLeads: leads.filter(l => l.fase !== 'Descartada' && l.modeloNegocio !== 'Mediação').length,
+    mediationPipeline: leads.filter(l => l.modeloNegocio === 'Mediação' && l.fase !== 'Descartada' && l.mediacaoFase !== 'Descartado').length,
+    mediationGestao: leads.filter(l => l.modeloNegocio === 'Mediação' && l.mediacaoFase === 'Contrato_Aceite').length,
     notes: notes.length,
     upcomingVisits: visits.filter(v => v.estado === 'Marcada' || v.estado === 'Confirmada').length,
     activeProposals: proposals.filter(p => p.estado === 'Enviada' || p.estado === 'Em negociação').length,
     activeOperations: operations.filter(o => o.fase !== 'Venda_Fechada' && o.fase !== 'Cancelado').length,
-    discardedLeads: leads.filter(l => l.fase === 'Descartada').length
+    discardedLeads: leads.filter(l => l.fase === 'Descartada' || l.modeloNegocio === 'Desativada' || l.mediacaoFase === 'Descartado').length
   }), [leads, notes, visits, proposals, operations]);
 
   const navItems = useMemo(() => [
@@ -57,16 +60,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       badge: counts.activeLeads
     },
     {
-      id: 'notes',
-      label: 'Notas & Follow-ups',
-      icon: StickyNote,
-      badge: counts.notes
-    },
-    {
-      id: 'calendar',
-      label: 'Calendário Visitas',
-      icon: Calendar,
-      badge: counts.upcomingVisits
+      id: 'operations',
+      label: 'Operações & CPCV',
+      icon: ShieldCheck,
+      badge: counts.activeOperations
     },
     {
       id: 'proposals',
@@ -75,20 +72,38 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       badge: counts.activeProposals
     },
     {
-      id: 'operations',
-      label: 'Operações & CPCV',
-      icon: ShieldCheck,
-      badge: counts.activeOperations
+      id: 'mediacao_pipeline',
+      label: 'CRM Mediação',
+      icon: Building2,
+      badge: counts.mediationPipeline
+    },
+    {
+      id: 'mediacao_gestao',
+      label: 'Gestão Mediação',
+      icon: Users,
+      badge: counts.mediationGestao
+    },
+    {
+      id: 'calendar',
+      label: 'Calendário Visitas',
+      icon: Calendar,
+      badge: counts.upcomingVisits
+    },
+    {
+      id: 'notes',
+      label: 'Notas & Follow-ups',
+      icon: StickyNote,
+      badge: counts.notes
     },
     {
       id: 'discarded',
       label: 'Descartadas',
       icon: Archive,
-      badge: null
+      badge: counts.discardedLeads > 0 ? counts.discardedLeads : null
     }
   ] as const, [counts]);
 
-  const handleNavClick = (id: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded') => {
+  const handleNavClick = (id: 'dashboard' | 'leads' | 'calendar' | 'proposals' | 'notes' | 'operations' | 'discarded' | 'mediacao_pipeline' | 'mediacao_gestao') => {
     setActiveTab(id);
     setMobileOpen(false);
   };

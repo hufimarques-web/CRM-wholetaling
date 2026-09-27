@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
   X, Phone, PhoneCall, MapPin, Calendar, FileText, Plus, Edit, Trash2,
-  CheckCircle2, AlertCircle, Building, Tag, Send, Clock, Sparkles, User, Check, ArrowRight, ShieldCheck,
+  CheckCircle2, AlertCircle, Building, Building2, Users, Tag, Send, Clock, Sparkles, User, Check, ArrowRight, ShieldCheck,
   Archive, RotateCcw, Mail, TrendingUp, Percent, Sliders
 } from 'lucide-react';
 import { useCRM } from '../../context/CRMContext';
-import { formatCurrency, formatDatePT, checkLeadReadiness, getContactStatusBadge, getPhotoStatusBadge, getPhaseBadge, getPriorityBadge, getVisitStateBadge, getProposalStateBadge, getUserTheme } from '../../utils/formatters';
-import { Lead } from '../../types/crm';
+import {
+  formatCurrency, formatDatePT, checkLeadReadiness, getContactStatusBadge,
+  getPhotoStatusBadge, getPhaseBadge, getPriorityBadge, getVisitStateBadge,
+  getProposalStateBadge, getUserTheme, getBusinessModelBadge, getMediationPhaseBadge
+} from '../../utils/formatters';
+import { Lead, BusinessModel, MediationPhase } from '../../types/crm';
 
 export const LeadDetailDrawer: React.FC = () => {
   const {
@@ -34,17 +38,37 @@ export const LeadDetailDrawer: React.FC = () => {
     operations,
     currentUser,
     visits,
-    proposals
+    proposals,
+    leads,
+    requalifyLead,
+    updateMediationPhase,
+    openPropertyMediationCRM
   } = useCRM();
 
   const [activeTab, setActiveTab] = useState<'info' | 'visits' | 'proposals' | 'notes'>('info');
   const [newNoteText, setNewNoteText] = useState('');
 
+  // Mediation Local Editable State (Declared unconditionally at top level)
+  const [mediacaoPreco, setMediacaoPreco] = useState<number | ''>('');
+  const [mediacaoComissao, setMediacaoComissao] = useState<number>(2.8);
+  const [mediacaoTipoContrato, setMediacaoTipoContrato] = useState<'Sem Exclusividade' | 'Com Exclusividade'>('Sem Exclusividade');
+  const [requalificacaoNotas, setRequalificacaoNotas] = useState<string>('');
 
+  const lead = selectedLeadForDrawer
+    ? (leads.find(l => l.id === selectedLeadForDrawer.id) || selectedLeadForDrawer)
+    : null;
 
-  if (!selectedLeadForDrawer) return null;
+  useEffect(() => {
+    if (lead) {
+      setMediacaoPreco(lead.mediacaoPrecoVenda ?? lead.valorMinimoAbsoluto ?? '');
+      setMediacaoComissao(lead.mediacaoComissaoPercent ?? 2.8);
+      setMediacaoTipoContrato(lead.mediacaoTipoContrato || 'Sem Exclusividade');
+      setRequalificacaoNotas(lead.requalificacaoNotas || '');
+    }
+  }, [lead?.id, lead?.modeloNegocio, lead?.mediacaoPrecoVenda, lead?.mediacaoComissaoPercent, lead?.requalificacaoNotas]);
 
-  const lead = selectedLeadForDrawer;
+  if (!selectedLeadForDrawer || !lead) return null;
+
   const leadVisits = visits.filter(v => v.leadId === lead.id);
   const leadProposals = proposals.filter(p => p.leadId === lead.id);
   const leadOperation = operations.find(o => o.leadId === lead.id);
@@ -55,6 +79,26 @@ export const LeadDetailDrawer: React.FC = () => {
   const phaseBadge = getPhaseBadge(lead.fase);
   const priorityBadge = getPriorityBadge(lead.prioridade);
   const userTheme = getUserTheme(lead.assignedTo || 'Queirós');
+  const businessBadge = getBusinessModelBadge(lead.modeloNegocio || 'Wholetailing');
+
+  const handleModelChange = (newModel: BusinessModel) => {
+    requalifyLead(lead.id, newModel, requalificacaoNotas, {
+      mediacaoPrecoVenda: typeof mediacaoPreco === 'number' ? mediacaoPreco : lead.valorMinimoAbsoluto,
+      mediacaoComissaoPercent: mediacaoComissao,
+      mediacaoTipoContrato
+    });
+  };
+
+  const handleSaveMediacaoField = (field: string, val: any) => {
+    if (field === 'mediacaoPrecoVenda') setMediacaoPreco(val);
+    if (field === 'mediacaoComissaoPercent') setMediacaoComissao(val);
+    if (field === 'mediacaoTipoContrato') setMediacaoTipoContrato(val);
+    if (field === 'requalificacaoNotas') setRequalificacaoNotas(val);
+
+    requalifyLead(lead.id, lead.modeloNegocio || 'Mediação', field === 'requalificacaoNotas' ? val : requalificacaoNotas, {
+      [field]: val
+    });
+  };
 
   const handleAddNoteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,6 +145,10 @@ export const LeadDetailDrawer: React.FC = () => {
               </span>
               <span className={`px-2 py-0.5 text-[10px] rounded-md font-bold border ${phaseBadge.bg} ${phaseBadge.text} ${phaseBadge.border}`}>
                 {lead.fase}
+              </span>
+              {/* Business Model Badge */}
+              <span className={`px-2 py-0.5 text-[10px] rounded-md font-bold border ${businessBadge.bg} ${businessBadge.text} ${businessBadge.border}`}>
+                {businessBadge.label}
               </span>
               {/* Assigned User Badge */}
               <span className={`flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-md font-bold border ${userTheme.badgeBg} ${userTheme.badgeText} ${userTheme.badgeBorder}`}>
@@ -300,6 +348,215 @@ export const LeadDetailDrawer: React.FC = () => {
           {/* TAB 1: FICHA GERAL COMPLETA */}
           {activeTab === 'info' && (
             <div className="space-y-6">
+
+              {/* SECTION: BLOCO DE REQUALIFICAÇÃO & MODELO DE NEGÓCIO */}
+              <div className="bg-white p-5 rounded-2xl border-2 border-stone-800 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-stone-900 text-amber-400">
+                      <Sparkles className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h3 className="font-extrabold text-xs text-stone-900 uppercase tracking-wider">
+                        Requalificação & Modelo de Negócio
+                      </h3>
+                      <p className="text-[10px] text-stone-500">
+                        Estratégia para este imóvel: Wholetailing (Base), Wholesaling, Mediação ou Desativação
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${businessBadge.bg} ${businessBadge.text} ${businessBadge.border}`}>
+                    {businessBadge.label}
+                  </span>
+                </div>
+
+                {/* Model Selection Tabs / Buttons */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleModelChange('Wholetailing')}
+                    className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                      lead.modeloNegocio === 'Wholetailing' || !lead.modeloNegocio
+                        ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-400/40 text-stone-900'
+                        : 'border-stone-200 bg-[#FAF8F5] hover:bg-stone-100 text-stone-600'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-black">Wholetailing</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-200 text-amber-900 rounded">Base</span>
+                    </div>
+                    <span className="text-[10px] text-stone-500 mt-1">Compra direta e valorização</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleModelChange('Wholesaling')}
+                    className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                      lead.modeloNegocio === 'Wholesaling'
+                        ? 'border-purple-500 bg-purple-50/70 ring-2 ring-purple-400/40 text-stone-900'
+                        : 'border-stone-200 bg-[#FAF8F5] hover:bg-stone-100 text-stone-600'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-black">Wholesaling</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-purple-200 text-purple-900 rounded">Investidores</span>
+                    </div>
+                    <span className="text-[10px] text-stone-500 mt-1">Cessão de contrato rápida</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleModelChange('Mediação')}
+                    className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                      lead.modeloNegocio === 'Mediação'
+                        ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-400/40 text-stone-900'
+                        : 'border-stone-200 bg-[#FAF8F5] hover:bg-stone-100 text-stone-600'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-black">Mediação</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-200 text-emerald-900 rounded">Comissão</span>
+                    </div>
+                    <span className="text-[10px] text-stone-500 mt-1">Angariação para vender a terceiros</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleModelChange('Desativada')}
+                    className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                      lead.modeloNegocio === 'Desativada'
+                        ? 'border-stone-500 bg-stone-200 ring-2 ring-stone-400/40 text-stone-900'
+                        : 'border-stone-200 bg-[#FAF8F5] hover:bg-stone-100 text-stone-600'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs font-black">Desativada</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-stone-300 text-stone-800 rounded">Arquivar</span>
+                    </div>
+                    <span className="text-[10px] text-stone-500 mt-1">Fora de critérios / recusado</span>
+                  </button>
+                </div>
+
+                {/* Mediação Configuration Sub-Panel */}
+                {lead.modeloNegocio === 'Mediação' && (
+                  <div className="bg-emerald-50/40 p-4 rounded-xl border border-emerald-300 space-y-3.5 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-emerald-900 flex items-center gap-1.5">
+                        <Building2 className="w-4 h-4 text-emerald-700" />
+                        <span>Configuração da Mediação Imobiliária</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-300">
+                        Ativa no CRM Mediação
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <label className="block text-[10px] font-bold text-emerald-900 uppercase mb-1">
+                          Preço de Venda Montra (€)
+                        </label>
+                        <input
+                          type="number"
+                          value={mediacaoPreco}
+                          onChange={e => handleSaveMediacaoField('mediacaoPrecoVenda', Number(e.target.value))}
+                          placeholder={String(lead.valorMinimoAbsoluto)}
+                          className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-emerald-900 uppercase mb-1">
+                          Comissão (% IVA incl.) & Valor
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={mediacaoComissao}
+                            onChange={e => handleSaveMediacaoField('mediacaoComissaoPercent', Number(e.target.value))}
+                            placeholder="2.8"
+                            className="w-20 px-3 py-1.5 bg-white border border-emerald-300 rounded-lg font-bold text-stone-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <span className="text-xs font-black text-emerald-800">
+                            = {formatCurrency(Math.round(((typeof mediacaoPreco === 'number' && mediacaoPreco > 0) ? mediacaoPreco : (lead.valorMinimoAbsoluto || 0)) * ((mediacaoComissao || 2.8) / 100)))} <span className="text-[10px] font-normal text-emerald-700">(c/ IVA)</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-emerald-900 uppercase mb-1">
+                          Fase do Contrato de Mediação
+                        </label>
+                        <select
+                          value={lead.mediacaoFase || 'Analise_Selecao'}
+                          onChange={e => {
+                            const val = e.target.value;
+                            handleSaveMediacaoField('mediacaoFase', val);
+                            if (val === 'Descartado') {
+                              updateMediationPhase(lead.id, 'Descartado');
+                            }
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-white border border-emerald-300 rounded-lg font-bold text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                          <option value="Analise_Selecao">1. Em Análise / Seleção</option>
+                          <option value="Proposta_Apresentada">2. Proposta Apresentada</option>
+                          <option value="Em_Negociacao">3. Em Negociação</option>
+                          <option value="Contrato_Aceite">4. Contrato Aceite / Assinado</option>
+                          <option value="Descartado">5. Descartado (Move para Descartadas)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-emerald-900 uppercase mb-1">
+                        Critérios de Requalificação / Condições do Imóvel
+                      </label>
+                      <input
+                        type="text"
+                        value={requalificacaoNotas}
+                        onChange={e => handleSaveMediacaoField('requalificacaoNotas', e.target.value)}
+                        placeholder="Ex: Proprietário pede 180k (fora de preço Wholetailing), mas imóvel está habitável e tem boa procura de mercado..."
+                        className="w-full px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+
+                    <div className="pt-1 flex items-center justify-between flex-wrap gap-2">
+                      <span className="text-[11px] text-stone-600 italic">
+                        {lead.mediacaoFase === 'Contrato_Aceite'
+                          ? '✓ Contrato Aceite! Este imóvel já tem gestão de compradores disponível.'
+                          : 'Quando o contrato for aceite, o imóvel passa automaticamente para a Gestão de Vendas.'}
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        {lead.mediacaoFase === 'Contrato_Aceite' && (
+                          <button
+                            onClick={() => {
+                              setSelectedLeadForDrawer(null);
+                              openPropertyMediationCRM(lead);
+                            }}
+                            className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-2xs transition flex items-center gap-1.5"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                            <span>Gerir Interessados (Mini CRM)</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => {
+                            setSelectedLeadForDrawer(null);
+                            setNavTab('mediacao_pipeline');
+                          }}
+                          className="px-3 py-1.5 bg-stone-900 hover:bg-black text-white rounded-lg text-xs font-bold transition flex items-center gap-1"
+                        >
+                          <span>Ver no CRM Mediação</span>
+                          <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* SECTION: ESTUDO DE MERCADO AVEIRO */}
               <div className="bg-[#FAF8F5] p-4 border border-stone-200 shadow-2xs space-y-3">

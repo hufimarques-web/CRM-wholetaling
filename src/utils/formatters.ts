@@ -1,4 +1,4 @@
-import { ContactStatus, PhotoStatus, LeadPhase, PriorityLevel, VisitState, ProposalState, Lead, AppUser, MarketDealRating } from '../types/crm';
+import { ContactStatus, PhotoStatus, LeadPhase, PriorityLevel, VisitState, ProposalState, Lead, AppUser, MarketDealRating, BusinessModel, MediationPhase, MediationBuyerStage } from '../types/crm';
 
 /**
  * Format numbers as Portuguese Euros (€)
@@ -284,3 +284,56 @@ export const getProposalStateBadge = (state: ProposalState) => {
       return { bg: 'bg-stone-100', text: 'text-stone-500', border: 'border-stone-200' };
   }
 };
+
+/**
+ * Color classes helper for Business Model / Requalificação
+ */
+export const getBusinessModelBadge = (model: BusinessModel = 'Wholetailing') => {
+  switch (model) {
+    case 'Wholetailing':
+      return { label: 'Wholetailing (Base)', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-200', dot: 'bg-amber-500' };
+    case 'Wholesaling':
+      return { label: 'Wholesaling (Investidores)', bg: 'bg-purple-50', text: 'text-purple-800', border: 'border-purple-200', dot: 'bg-purple-500' };
+    case 'Mediação':
+      return { label: 'Mediação Imobiliária', bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-300', dot: 'bg-emerald-600' };
+    case 'Desativada':
+      return { label: 'Desativada', bg: 'bg-stone-100', text: 'text-stone-500', border: 'border-stone-200', dot: 'bg-stone-400' };
+  }
+};
+
+/**
+ * Color classes helper for Mediation Pipeline Phase (Angariação / Contrato)
+ */
+export const getMediationPhaseBadge = (phase: MediationPhase = 'Analise_Selecao') => {
+  switch (phase) {
+    case 'Analise_Selecao':
+      return { label: 'Em Análise / Seleção', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' };
+    case 'Proposta_Apresentada':
+      return { label: 'Proposta Apresentada', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
+    case 'Em_Negociacao':
+      return { label: 'Em Negociação', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' };
+    case 'Contrato_Aceite':
+      return { label: 'Contrato Aceite / Assinado', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-300' };
+    case 'Descartado':
+      return { label: 'Descartado / Recusado', bg: 'bg-stone-100', text: 'text-stone-500', border: 'border-stone-200' };
+  }
+};
+
+/**
+ * Color classes helper for Mediation Buyer Stage (Mini CRM do Imóvel)
+ */
+export const getMediationBuyerStageBadge = (stage: MediationBuyerStage = 'Interessado') => {
+  switch (stage) {
+    case 'Interessado':
+      return { label: 'Interessado', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' };
+    case 'Visita':
+      return { label: 'Visita Agendada / Feita', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' };
+    case 'Proposta':
+      return { label: 'Proposta / Negociação', bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200' };
+    case 'Fechado':
+      return { label: 'Fechado (Vendido)', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-300' };
+    case 'Descartado':
+      return { label: 'Descartado', bg: 'bg-stone-100', text: 'text-stone-500', border: 'border-stone-200' };
+  }
+};
+
