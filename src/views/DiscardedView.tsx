@@ -190,130 +190,170 @@ export const DiscardedView: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredDiscardedLeads.map(lead => {
-            const userTheme = getUserTheme(lead.assignedTo);
-            const latestNote = lead.notas && lead.notas.length > 0 ? lead.notas[0] : null;
+        <div className="bg-white rounded-2xl border border-stone-200/90 shadow-2xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-[#FAF8F5] border-b border-stone-200 text-[10px] font-black uppercase tracking-wider text-stone-500">
+                  <th className="py-3.5 px-4">Proprietário & Contacto</th>
+                  <th className="py-3.5 px-4">Imóvel & Localização</th>
+                  <th className="py-3.5 px-4">Valor Mínimo</th>
+                  <th className="py-3.5 px-4">Origem / Modelo</th>
+                  <th className="py-3.5 px-4">Responsável</th>
+                  <th className="py-3.5 px-4">Data Entrada</th>
+                  <th className="py-3.5 px-4">Motivo / Última Nota</th>
+                  <th className="py-3.5 px-4 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {filteredDiscardedLeads.map(lead => {
+                  const userTheme = getUserTheme(lead.assignedTo);
+                  const latestNote = lead.notas && lead.notas.length > 0 ? lead.notas[0] : null;
+                  const valor = lead.mediacaoPrecoVenda || lead.valorMinimoAbsoluto;
 
-            return (
-              <div
-                key={lead.id}
-                className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 relative overflow-hidden"
-              >
-                {/* Top Lead Info */}
-                <div>
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-sm font-bold text-stone-900 font-display">
+                  return (
+                    <tr
+                      key={lead.id}
+                      className="hover:bg-amber-50/40 transition group"
+                    >
+                      {/* Proprietário & Contacto */}
+                      <td className="py-3.5 px-4 align-middle">
+                        <div
+                          onClick={() => setSelectedLeadForDrawer(lead)}
+                          className="font-bold text-stone-900 cursor-pointer hover:text-emerald-700 transition"
+                        >
                           {lead.nomeProprietario}
-                        </h4>
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase tracking-wider">
-                          Descartada
+                        </div>
+                        {lead.telefone ? (
+                          <div className="flex items-center gap-2 mt-0.5 text-[11px]">
+                            <a
+                              href={`tel:${lead.telefone}`}
+                              className="text-stone-500 hover:text-amber-800 flex items-center gap-1 font-mono"
+                            >
+                              <Phone className="w-3 h-3 text-amber-600" />
+                              <span>{lead.telefone}</span>
+                            </a>
+                            <a
+                              href={`https://wa.me/351${lead.telefone.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-emerald-600 hover:text-emerald-700 font-bold text-[10px]"
+                            >
+                              WA
+                            </a>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-stone-400 italic">Sem contacto</span>
+                        )}
+                      </td>
+
+                      {/* Imóvel & Localização */}
+                      <td className="py-3.5 px-4 align-middle">
+                        <div className="font-semibold text-stone-800 flex items-center gap-1">
+                          <Building className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                          <span>{lead.tipoImovel}</span>
+                          {lead.areaM2 && <span className="text-stone-500 font-normal">({lead.areaM2} m²)</span>}
+                        </div>
+                        <div className="text-[11px] text-stone-500 flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span className="truncate max-w-[160px]">{lead.freguesia}</span>
+                        </div>
+                      </td>
+
+                      {/* Valor Mínimo */}
+                      <td className="py-3.5 px-4 align-middle whitespace-nowrap">
+                        <span className="font-black text-stone-900">
+                          {formatCurrency(valor)}
                         </span>
-                        {lead.modeloNegocio === 'Mediação' && (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 text-amber-900 border border-amber-300 uppercase tracking-wider">
-                            Mediação
+                      </td>
+
+                      {/* Origem / Modelo */}
+                      <td className="py-3.5 px-4 align-middle whitespace-nowrap">
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase tracking-wider">
+                            Descartada
                           </span>
-                        )}
-                        {lead.modeloNegocio === 'Desativada' && (
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-stone-100 text-stone-700 border border-stone-300 uppercase tracking-wider">
-                            Desativada
-                          </span>
-                        )}
-                        {/* Assigned User */}
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold border ${userTheme.badgeBg} ${userTheme.badgeText} ${userTheme.badgeBorder}`}>
+                          {lead.modeloNegocio === 'Mediação' && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 text-amber-900 border border-amber-300 uppercase tracking-wider">
+                              Mediação
+                            </span>
+                          )}
+                          {lead.modeloNegocio === 'Desativada' && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-stone-100 text-stone-700 border border-stone-300 uppercase tracking-wider">
+                              Desativada
+                            </span>
+                          )}
+                          {(lead.modeloNegocio === 'Wholetailing' || !lead.modeloNegocio) && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-stone-50 text-stone-600 border border-stone-200 uppercase tracking-wider">
+                              Wholetailing
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Responsável */}
+                      <td className="py-3.5 px-4 align-middle whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${userTheme.badgeBg} ${userTheme.badgeText} ${userTheme.badgeBorder}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${userTheme.dot}`}></span>
                           <span>{lead.assignedTo}</span>
                         </span>
-                      </div>
+                      </td>
 
-                      <div className="flex items-center gap-3 text-xs text-stone-500 mt-1">
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-amber-600 shrink-0" />
-                          <span>{lead.freguesia}</span>
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Building className="w-3 h-3 text-stone-400 shrink-0" />
-                          <span>{lead.tipoImovel} {lead.areaM2 ? `(${lead.areaM2} m²)` : ''}</span>
-                        </span>
-                      </div>
-                    </div>
+                      {/* Data Entrada */}
+                      <td className="py-3.5 px-4 align-middle whitespace-nowrap text-stone-500 text-[11px]">
+                        {formatDatePT(lead.dataEntrada)}
+                      </td>
 
-                    <div className="text-right shrink-0">
-                      <span className="text-[10px] uppercase font-bold text-stone-400 block tracking-wider">
-                        Mínimo Absoluto
-                      </span>
-                      <span className="text-sm font-black text-stone-900">
-                        {formatCurrency(lead.valorMinimoAbsoluto)}
-                      </span>
-                    </div>
-                  </div>
+                      {/* Motivo / Última Nota */}
+                      <td className="py-3.5 px-4 align-middle max-w-xs">
+                        {lead.requalificacaoNotas ? (
+                          <p className="text-[11px] text-amber-900 italic line-clamp-2 bg-amber-50/60 p-1.5 rounded border border-amber-100">
+                            "{lead.requalificacaoNotas}"
+                          </p>
+                        ) : latestNote ? (
+                          <p className="text-[11px] text-stone-600 italic line-clamp-2" title={latestNote.text}>
+                            "{latestNote.text}"
+                          </p>
+                        ) : (
+                          <span className="text-[10px] text-stone-400 italic">Sem notas</span>
+                        )}
+                      </td>
 
-                  {/* Telefone e Data */}
-                  <div className="flex items-center gap-3 text-xs text-stone-600 pt-2 border-t border-stone-100">
-                    <a
-                      href={`tel:${lead.telefone}`}
-                      className="flex items-center gap-1 font-semibold text-amber-800 hover:underline"
-                    >
-                      <Phone className="w-3 h-3 text-amber-600" />
-                      <span>{lead.telefone}</span>
-                    </a>
-                    <span>•</span>
-                    <span className="text-[11px] text-stone-400">
-                      Entrada: {formatDatePT(lead.dataEntrada)}
-                    </span>
-                  </div>
+                      {/* Ações */}
+                      <td className="py-3.5 px-4 align-middle text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setSelectedLeadForDrawer(lead)}
+                            className="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-semibold transition"
+                            title="Ver Ficha Completa"
+                          >
+                            Ficha
+                          </button>
 
-                  {/* Notas / Motivo de Descarte */}
-                  {latestNote && (
-                    <div className="mt-3 p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs text-stone-700 leading-relaxed">
-                      <div className="flex items-center justify-between mb-1 text-[10px] text-stone-400 font-semibold">
-                        <span className="flex items-center gap-1 text-stone-600">
-                          <FileText className="w-3 h-3 text-stone-500" />
-                          Última Nota / Análise:
-                        </span>
-                        <span>{formatDatePT(latestNote.date)}</span>
-                      </div>
-                      <p className="line-clamp-2 text-stone-600 italic">
-                        "{latestNote.text}"
-                      </p>
-                    </div>
-                  )}
-                </div>
+                          <button
+                            onClick={() => handleRestore(lead.id, lead.nomeProprietario)}
+                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-2xs transition flex items-center gap-1"
+                            title="Reativar Lead e colocar no funil ativo"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Reativar</span>
+                          </button>
 
-                {/* Actions Footer */}
-                <div className="pt-3 border-t border-stone-100 flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => setSelectedLeadForDrawer(lead)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Ver Ficha Completa</span>
-                  </button>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => requestDeleteLead(lead.id)}
-                      className="p-2 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition"
-                      title="Eliminar definitivamente da base de dados"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-
-                    <button
-                      onClick={() => handleRestore(lead.id, lead.nomeProprietario)}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-xs transition"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Reativar Lead</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                          <button
+                            onClick={() => requestDeleteLead(lead.id)}
+                            className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                            title="Eliminar definitivamente"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
