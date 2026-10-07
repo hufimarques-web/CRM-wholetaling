@@ -6,9 +6,17 @@ import { AppUser } from '../types/crm';
 export const LoginView: React.FC = () => {
   const { login } = useCRM();
   const [selectedUser, setSelectedUser] = useState<AppUser>('Queirós');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleLogin = (user: AppUser) => {
-    login(user);
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true); setError('');
+    try { await login(selectedUser, password); setPassword(''); }
+    catch (error: any) { setError(error.message || 'Não foi possível iniciar sessão.'); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -55,7 +63,7 @@ export const LoginView: React.FC = () => {
         </div>
 
         {/* Right Side: Profile Selection & Login (Dark Luxury Canvas) */}
-        <div className="p-8 sm:p-10 flex flex-col justify-center space-y-6 bg-[#131417]">
+        <form onSubmit={handleLogin} className="p-8 sm:p-10 flex flex-col justify-center space-y-6 bg-[#131417]">
           <div>
             <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-amber-400/90 block mb-1 font-display">
               Acesso Restrito
@@ -82,13 +90,13 @@ export const LoginView: React.FC = () => {
             >
               <div className="flex items-center space-x-3.5">
                 <div className="w-12 h-12 rounded-lg bg-emerald-700 text-white font-medium text-base flex items-center justify-center shadow-xs font-display">
-                  Q
+                  A
                 </div>
                 <div>
-                  <h4 className="font-medium text-sm text-white tracking-wide leading-tight font-display">Queirós</h4>
+                  <h4 className="font-medium text-sm text-white tracking-wide leading-tight font-display">André</h4>
                   <p className="text-[11px] font-light text-stone-300 mt-0.5 font-sans">Operações & Estratégia de Arbitragem</p>
                   <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-normal tracking-wider bg-emerald-900/50 text-emerald-300 border border-emerald-700/40">
-                    Sessão Ativa Esmeralda
+                    Perfil de André
                   </span>
                 </div>
               </div>
@@ -117,7 +125,7 @@ export const LoginView: React.FC = () => {
                   <h4 className="font-medium text-sm text-white tracking-wide leading-tight font-display">Hugo</h4>
                   <p className="text-[11px] font-light text-stone-300 mt-0.5 font-sans">Comercial & Negociação com Proprietários</p>
                   <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-normal tracking-wider bg-amber-900/50 text-amber-300 border border-amber-700/40">
-                    Sessão Ativa Âmbar
+                    Perfil de Hugo
                   </span>
                 </div>
               </div>
@@ -132,22 +140,26 @@ export const LoginView: React.FC = () => {
           </div>
 
           {/* Login Action Button */}
+          <label className="block text-sm text-stone-200">Palavra-passe
+            <input type="password" autoComplete="current-password" required maxLength={256} value={password} onChange={event => setPassword(event.target.value)} className="mt-2 w-full rounded-lg border border-stone-700 bg-[#191A1E] px-4 py-3 text-base text-white focus:border-emerald-400 focus:outline-none" />
+          </label>
+          {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
           <button
-            onClick={() => handleLogin(selectedUser)}
+            type="submit" disabled={busy}
             className={`w-full py-3.5 px-6 rounded-xl font-medium text-xs uppercase tracking-[0.15em] text-white shadow-lg transition-all flex items-center justify-center space-x-2 font-display ${
               selectedUser === 'Queirós'
                 ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50 hover:shadow-emerald-900/70'
                 : 'bg-amber-600 hover:bg-amber-500 shadow-amber-950/50 hover:shadow-amber-900/70'
             }`}
           >
-            <span>Entrar como {selectedUser}</span>
+            <span>{busy ? 'A entrar...' : `Entrar como ${selectedUser === 'Queirós' ? 'André' : selectedUser}`}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
           <p className="text-[10px] font-light tracking-wider text-center text-stone-400 font-sans">
-            Ambiente Wholetailing CRM • Base de dados Prisma SQLite ativa
+            Acesso reservado à equipa Wholetailing
           </p>
-        </div>
+        </form>
 
       </div>
     </div>
