@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 export const PRIVACY_VERSION = '2026-10-07-v1';
+export const REVIEW_PRIVACY_VERSION = '2026-10-07-v2';
 export class IntakeError extends Error {
   status: number;
   constructor(status: number, message: string) { super(message); this.status = status; }
@@ -37,10 +38,11 @@ export function validateSubmission(body: unknown, now = Date.now()) {
   if (typeof raw.startedAt !== 'number' || !Number.isFinite(raw.startedAt) || now - raw.startedAt < 2500 || now - raw.startedAt > 172800000) throw new IntakeError(400, 'Atualize a página e tente novamente.');
   const requestId = text('requestId', 36);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) throw new IntakeError(400, 'Atualize a página e tente novamente.');
-  if (raw.contactConsent !== true || raw.privacyVersion !== PRIVACY_VERSION) throw new IntakeError(400, 'Confirme que pretende ser contactado sobre este pedido.');
+  const reviewOnly = raw.privacyVersion === REVIEW_PRIVACY_VERSION;
+  if (reviewOnly ? raw.contactRequested !== true : raw.contactConsent !== true || raw.privacyVersion !== PRIVACY_VERSION) throw new IntakeError(400, 'Confirme que pretende enviar este pedido.');
   const telefone = normalizePhone(text('telefone', 24));
   if (!/^\+[1-9]\d{7,14}$/.test(telefone) || (telefone.startsWith('+351') && !/^\+3519\d{8}$/.test(telefone))) throw new IntakeError(400, 'Confirme o telemóvel.');
-  if (normalizePhone(text('telefoneConfirmacao', 24)) !== telefone) throw new IntakeError(400, 'Os números de telemóvel não coincidem.');
+  if (!reviewOnly && normalizePhone(text('telefoneConfirmacao', 24)) !== telefone) throw new IntakeError(400, 'Os números de telemóvel não coincidem.');
   const tipoImovel = choice('tipoImovel', ['Moradia', 'Apartamento', 'Terreno', 'Prédio']);
   const estados = tipoImovel === 'Terreno'
     ? ['Construção confirmada por documento', 'Possível construção, ainda por confirmar', 'Terreno rústico / agrícola', 'Não sei']
@@ -66,7 +68,7 @@ export function validateSubmission(body: unknown, now = Date.now()) {
     enquadramento: choice('enquadramento', ['sim', 'talvez']),
     horario: choice('horario', ['Manhã', 'Hora de almoço', 'Tarde', 'Depois das 18h']),
     fotosDisponiveis: choice('fotosDisponiveis', ['Sim, posso enviar depois', 'Ainda preciso de tirar']),
-    privacyVersion: PRIVACY_VERSION
+    privacyVersion: reviewOnly ? REVIEW_PRIVACY_VERSION : PRIVACY_VERSION
   };
   if (data.nomeProprietario.length < 2 || data.localizacao.length < 2) throw new IntakeError(400, 'Confirme o nome e a localização.');
   const id = `lp-${createHash('sha256').update(JSON.stringify({ requestId, ...data })).digest('hex')}`;
@@ -95,7 +97,9 @@ export function leadRecord(submission: ReturnType<typeof validateSubmission>, no
     `Motivo: ${d.motivo || 'Não indicado'}`,
     `Melhor horário: ${d.horario}`,
     `Fotografias: ${d.fotosDisponiveis}`,
-    'Telemóvel confirmado por dupla introdução; não verificado por SMS.',
+    d.privacyVersion === REVIEW_PRIVACY_VERSION
+      ? 'Telemóvel apresentado para confirmação antes do envio; não verificado por SMS.'
+      : 'Telemóvel confirmado por dupla introdução; não verificado por SMS.',
     `Pediu contacto sobre este imóvel. Aviso de privacidade: ${d.privacyVersion}.`,
     `Recebido em: ${now.toISOString()}`,
     'Localização exata, preço de mercado e margem ainda por analisar.'

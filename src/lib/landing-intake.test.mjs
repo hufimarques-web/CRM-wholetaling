@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateSubmission, leadRecord, saveSubmission, PRIVACY_VERSION } from './landing-intake.ts';
+import { validateSubmission, leadRecord, saveSubmission, PRIVACY_VERSION, REVIEW_PRIVACY_VERSION } from './landing-intake.ts';
 
 const valid = () => ({
   requestId: '35b056a7-8f7c-4dc6-b787-49b55ebd73ba', startedAt: Date.now() - 5000,
@@ -24,6 +24,21 @@ test('normalizes phone and maps the full submission without invented market data
   assert.equal(record.precoM2, null);
   assert.equal(record.notas.create.text, record.requalificacaoNotas);
   for (const expected of ['100000', '150000', '120000', 'Licença de habitação: Sim', 'Numa imobiliária: Não', 'Tarde', 'não verificado por SMS']) assert.ok(record.requalificacaoNotas.includes(expected));
+});
+
+test('review-only form accepts one phone and records the actual confirmation method', () => {
+  const raw = { ...valid(), privacyVersion: REVIEW_PRIVACY_VERSION, contactRequested: true };
+  delete raw.telefoneConfirmacao;
+  delete raw.contactConsent;
+  const submission = validateSubmission(raw);
+  const record = leadRecord(submission);
+  assert.equal(record.telefone, '+351900000000');
+  assert.ok(record.requalificacaoNotas.includes('apresentado para confirmação'));
+  assert.ok(!record.requalificacaoNotas.includes('dupla introdução'));
+  assert.equal(validateSubmission({ ...raw, startedAt: raw.startedAt - 1000 }).id, submission.id);
+  for (const patch of [{ contactRequested: false }, { contactRequested: undefined, contactConsent: true }, { telefone: 'invalid' }, { privacyVersion: 'unknown' }]) {
+    assert.throws(() => validateSubmission({ ...raw, ...patch }), { status: 400 });
+  }
 });
 
 test('rejects malformed or unsafe requests', () => {
