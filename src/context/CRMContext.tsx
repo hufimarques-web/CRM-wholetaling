@@ -27,7 +27,7 @@ interface CRMContextType {
   isAuthenticated: boolean;
   currentUser: AppUser;
   setCurrentUser: (user: AppUser) => void;
-  login: (user: AppUser) => void;
+  login: (user: AppUser, password: string) => Promise<void>;
   logout: () => void;
 
   // Navigation & Search
@@ -181,9 +181,7 @@ const areEntitiesEqual = (a: any[], b: any[]): boolean => {
 
 export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Authentication State
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return getSafeLocalStorage('wt_crm_auth') === 'true';
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<AppUser>(() => {
     const saved = getSafeLocalStorage('wt_crm_current_user');
@@ -196,16 +194,29 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     currentUserRef.current = currentUser;
   }, [currentUser]);
 
-  const login = useCallback((user: AppUser) => {
-    setCurrentUser(user);
+  const login = useCallback(async (user: AppUser, password: string) => {
+    const response = await fetch('/api/auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user, password }) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Não foi possível iniciar sessão.');
+    setCurrentUser(result.user);
     setIsAuthenticated(true);
-    setSafeLocalStorage('wt_crm_current_user', user);
-    setSafeLocalStorage('wt_crm_auth', 'true');
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const response = await fetch('/api/auth/session', { method: 'DELETE' });
+    if (!response.ok) { window.alert('Não foi possível terminar a sessão. Tente novamente.'); return; }
     setIsAuthenticated(false);
-    setSafeLocalStorage('wt_crm_auth', 'false');
+    window.location.reload();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/auth/session', { cache: 'no-store' }).then(async response => {
+      if (!response.ok) return;
+      const result = await response.json();
+      if (active) { setCurrentUser(result.user); setIsAuthenticated(true); }
+    }).catch(() => {});
+    return () => { active = false; };
   }, []);
 
   // Navigation & Search
@@ -266,6 +277,11 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time synchronization & bootstrap directly with Prisma DB
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLeads([]); setVisits([]); setProposals([]); setNotes([]); setOperations([]);
+      setIsLoaded(false);
+      return;
+    }
     let isMounted = true;
 
     // Purge legacy local storage items to ensure every client is 100% database-driven
@@ -289,6 +305,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         });
 
+        if (res.status === 401) { setIsAuthenticated(false); return; }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
@@ -322,6 +339,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             'Pragma': 'no-cache'
           }
         });
+        if (res.status === 401) { setIsAuthenticated(false); return; }
         if (!res.ok) return;
         const data = await res.json();
         if (!isMounted || !data) return;
@@ -352,7 +370,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (selectedLeadForDrawer) {
