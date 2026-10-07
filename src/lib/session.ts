@@ -7,7 +7,8 @@ export type SessionUser = typeof USERS[number];
 
 export function passwordFor(user: SessionUser) {
   const value = user === 'Hugo' ? process.env.CRM_PASSWORD_HUGO : process.env.CRM_PASSWORD_ANDRE;
-  return value && value.length >= 16 ? value : null;
+  const minimumLength = user === 'Hugo' ? 16 : 8;
+  return value && value.length >= minimumLength ? value : null;
 }
 
 async function signingKey(password: string) {

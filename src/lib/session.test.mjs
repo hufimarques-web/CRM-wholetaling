@@ -37,3 +37,28 @@ test('mutations reject cross-site and missing origins', () => {
   assert.equal(sameOrigin(new Request(url, { headers: { origin: 'https://untrusted.example' } })), false);
   assert.equal(sameOrigin(new Request(url)), false);
 });
+
+test('Andre accepts eight characters while Hugo still requires sixteen', async () => {
+  const previousHugo = process.env.CRM_PASSWORD_HUGO;
+  const previousAndre = process.env.CRM_PASSWORD_ANDRE;
+  try {
+    process.env.CRM_PASSWORD_ANDRE = 'fixture';
+    assert.equal(passwordFor('Queirós'), null);
+    await assert.rejects(createSession('Queirós'));
+    process.env.CRM_PASSWORD_ANDRE = 'fixture8';
+    assert.equal(passwordFor('Queirós'), 'fixture8');
+    const token = await createSession('Queirós');
+    assert.equal(await readSession(token), 'Queirós');
+    process.env.CRM_PASSWORD_HUGO = 'fixture8';
+    assert.equal(passwordFor('Hugo'), null);
+    process.env.CRM_PASSWORD_HUGO = '123456789012345';
+    assert.equal(passwordFor('Hugo'), null);
+    process.env.CRM_PASSWORD_HUGO = '1234567890123456';
+    assert.equal(await readSession(await createSession('Hugo')), 'Hugo');
+    process.env.CRM_PASSWORD_ANDRE = 'changed8';
+    assert.equal(await readSession(token), null);
+  } finally {
+    if (previousHugo === undefined) delete process.env.CRM_PASSWORD_HUGO; else process.env.CRM_PASSWORD_HUGO = previousHugo;
+    if (previousAndre === undefined) delete process.env.CRM_PASSWORD_ANDRE; else process.env.CRM_PASSWORD_ANDRE = previousAndre;
+  }
+});
