@@ -12,6 +12,14 @@ Criadas com a ferramenta integrada image_gen. As ilustrações são decorativas 
 
 ## Variante Gotham
 
+### Kryptonite
+
+Criada com a ferramenta integrada image_gen. Ficheiro: `public/images/crm/kryptonite.webp`, 256 px, alpha preservado. É um elemento decorativo exclusivo do tema Gotham, não um indicador de estado do CRM.
+
+Use case: stylized-concept. Asset type: transparent decorative 3D accent for a Batman-inspired CRM dashboard. One small cluster of three angular kryptonite crystals, intense emerald green translucent mineral with internal luminous lime-green veins, resting on a compact dark graphite containment puck with subtle machined metal grooves. Premium realistic CGI product rendering, dramatic rim light, restrained green light spill and contact shadow, sharp faceted crystals, a precious collectible specimen rather than cartoon. Three-quarter elevated camera, full object centered with generous margins, square framing. Genuinely transparent background, no backdrop, no text, no logos, no labels, no watermark, no hands, no people. Palette charcoal black and luminous emerald, aesthetically compatible with a dark Gotham architectural miniature and gold UI.
+
+### Arquitetura
+
 Ilustração gerada com image_gen, transparente e decorativa. Ficheiros: `public/images/crm/gotham-architecture.webp` (960 px) e `public/images/crm/gotham-architecture-small.webp` (480 px). Substitui a miniatura anterior no destaque de angariação; os ficheiros anteriores foram preservados.
 
 Use case: stylized-concept. Asset type: transparent 3D hero illustration for a Batman-inspired real estate CRM, fictional Gotham mood. Create an elegant compact architectural miniature of three Gotham City buildings on a single thin floating charcoal plinth: one tall Art Deco tower with stepped crown, one mid-rise dark stone apartment block, one small contemporary townhouse. Premium realistic physical architectural model with black graphite stone, smoked glass, brushed brass trim and selective warm golden lit windows. A small spotlight on the plinth sends a subtle golden cone upward behind the tower into a circular smoky halo containing a recognizable stylized bat silhouette, like the Bat-Signal. Restrained cinematic lighting, small rain-sheen highlights, beautiful detailed facade bevels, high-end collectible product photography, three-quarter elevated isometric view, all buildings fully visible. Centered landscape 3:2 composition with generous transparent margins, no background city beyond the miniature, genuinely transparent background, no words or letters or labels, no people, no vehicles, no watermark. Color palette carbon black #111318, graphite #262930, muted brass #caa54a and warm yellow #f4cc58. Refined Batman atmosphere, professional dashboard asset, not a busy comic illustration.

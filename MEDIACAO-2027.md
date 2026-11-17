@@ -99,3 +99,7 @@ Os proprietários anteriores aparecem em Imóveis → Proprietários anteriores.
 `/dev-preview` só existe em desenvolvimento, com dados declaradamente fictícios e gravação desativada. Em produção devolve 404. `?mobile=1` mostra duas janelas de 390 px para inspeção de layout.
 
 A página pública informa a finalidade do contacto e separa a medição opcional. A identificação legal e os contactos da entidade responsável devem corresponder à operação de mediação efetiva antes de ativar campanhas públicas.
+
+## Visuais do CRM
+
+O seletor **Visual do CRM**, no topo e no ecrã de entrada, alterna entre **Normal** (claro, verde discreto e arquitetura) e **Gotham** (grafite, dourado, Bat-Sinal e kryptonite decorativa). Gotham é o valor inicial. A escolha fica guardada neste navegador e sincroniza entre separadores; não altera dados, formulários em curso ou permissões. Sem acesso ao armazenamento local, a alternância continua a funcionar durante a visita.
