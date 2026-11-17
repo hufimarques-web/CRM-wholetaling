@@ -10,6 +10,7 @@ import { QuestionLibrary } from './question-ui';
 import './questions.css';
 import './navigation.css';
 import './studio.css';
+import './dimensional.css';
 
 export const money = (n: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0);
 export const date = (value?: string) => value ? new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value)) : '—';
@@ -46,7 +47,7 @@ async function server(action?: string, data?: any) {
   return result;
 }
 export function Badge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: string }) { return <span className={`med-badge ${tone}`}>{children}</span>; }
-function Empty({ title, detail }: { title: string; detail?: string }) { return <div className="med-empty"><Database size={26}/><h3>{title}</h3>{detail && <p>{detail}</p>}</div>; }
+function Empty({ title, detail }: { title: string; detail?: string }) { return <div className="med-empty"><img className="empty-3d" src="/images/crm/key-copper.webp" width={112} height={112} alt="" loading="lazy" decoding="async"/><h3>{title}</h3>{detail && <p>{detail}</p>}</div>; }
 
 export default function Workspace({ previewData, previewTransport }: { previewData?: MediationData; previewTransport?: Transport }) {
   const [session, setSession] = useState<string | null>(previewData ? 'Hugo' : null);
@@ -115,7 +116,7 @@ export default function Workspace({ previewData, previewTransport }: { previewDa
         {(tab === 'owners' || tab === 'campaigns') && <AcquisitionWorkspace key={tab} mode={tab} data={data} save={mutate} busy={busy} transport={transport}/>}
         {tab === 'questions' && <QuestionLibrary data={data} save={mutate} busy={busy}/>}
         {tab === 'overview' && <>
-          <div className="acquisition-pulse"><div><h2>Angariação contínua</h2><p>{ownerPending.length} proprietários por validar · {data.campaigns.filter(c => c.kind === 'Angariação' && c.published).length} páginas publicadas para captar novos imóveis</p></div><button className="secondary" onClick={() => navigate('owners')}>Acompanhar angariações <ArrowRight size={16}/></button></div>
+          <div className="acquisition-pulse dimensional-hero"><div className="hero-copy"><span className="hero-kicker">ESPAÇO PARA O PRÓXIMO NEGÓCIO</span><h2>Angariação contínua</h2><p>{ownerPending.length} proprietários por validar · {data.campaigns.filter(c => c.kind === 'Angariação' && c.published).length} páginas publicadas para captar novos imóveis</p><button className="secondary" onClick={() => navigate('owners')}>Acompanhar angariações <ArrowRight size={16}/></button></div><div className="hero-object" aria-hidden="true"><img src="/images/crm/architecture-copper.webp" srcSet="/images/crm/architecture-copper-small.webp 480w, /images/crm/architecture-copper.webp 960w" sizes="(max-width: 760px) 300px, 420px" width={960} height={640} alt="" fetchPriority="high" decoding="async"/></div></div>
           <div className="metric-band">{[
             { label: 'Compradores qualificados', value: qualified.length, sub: 'Chamada validada', icon: Users, color: 'green' },
             { label: 'Por contactar', value: pending.length, sub: 'Compradores por qualificar', icon: Phone, color: 'amber' },
