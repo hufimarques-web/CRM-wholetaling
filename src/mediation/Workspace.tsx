@@ -6,6 +6,8 @@ import type { Buyer, MediationData, Partner } from './types';
 import { EntityEditor, Modal, Field, type Editor } from './editors';
 import './workspace.css';
 import { AcquisitionWorkspace } from './acquisition-ui';
+import { QuestionLibrary } from './question-ui';
+import './questions.css';
 
 export const money = (n: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0);
 export const date = (value?: string) => value ? new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value)) : '—';
@@ -17,6 +19,7 @@ const tabs = [
   { id: 'properties', label: 'Imóveis', icon: Building2 },
   { id: 'owners', label: 'Angariação', icon: Handshake },
   { id: 'campaigns', label: 'Páginas e anúncios', icon: Radio },
+  { id: 'questions', label: 'Banco de perguntas', icon: ClipboardCheck },
   { id: 'launches', label: 'Lançamentos', icon: CalendarDays },
   { id: 'partners', label: 'Parceiros', icon: Handshake },
   { id: 'referrals', label: 'Indicações e prémios', icon: ArrowDownLeft },
@@ -89,13 +92,14 @@ export default function Workspace({ previewData, previewTransport }: { previewDa
       {error && <div className="med-alert" role="alert"><span>{error}</span><button className="icon-button" title="Fechar aviso" onClick={() => setError('')}><X size={16}/></button></div>}
       {notice && <div className="med-notice" role="status"><CheckCircle2 size={17}/><span>{notice}</span><button className="icon-button" title="Fechar aviso" onClick={() => setNotice('')}><X size={16}/></button></div>}
       {!data ? <><Empty title={error ? 'Não foi possível carregar o CRM' : 'A carregar o espaço comercial…'}/>{error && <button className="secondary" onClick={refresh}>Tentar novamente</button>}</> : <>
-        <div className="page-heading"><div><div className="eyebrow">MEDIAÇÃO & CONSTRUÇÃO</div><h1>{tab === 'overview' ? 'O próximo negócio começa aqui.' : title}</h1><p>{({ owners: 'Proprietários, chamadas e contratos de mediação.', campaigns: 'Angariação contínua e anúncios de cada imóvel, com origens separadas.', overview: 'Compradores preparados. Imóveis certos. Uma equipa alinhada.', screening: 'Contactos recebidos e chamadas por validar.', buyers: 'Uma lista única, mesmo quando o imóvel anunciado não é o certo.', properties: 'Angariações, mediação e construção de raiz.', launches: 'Primeiro a lista. Depois o mercado.', partners: 'A rede que traz os próximos compradores.', referrals: 'Da indicação ao CPCV, com cada prémio acompanhado.', bank: 'Contactos sem enquadramento atual, preservados para acompanhamento.', meta: 'Só a qualidade confirmada pela equipa gera um sinal.' })[tab]}</p></div><div className="heading-actions">
+        <div className="page-heading"><div><div className="eyebrow">MEDIAÇÃO & CONSTRUÇÃO</div><h1>{tab === 'overview' ? 'O próximo negócio começa aqui.' : title}</h1><p>{({ questions: 'Conjuntos reutilizáveis, regras de qualificação e versões preservadas.', owners: 'Proprietários, chamadas e contratos de mediação.', campaigns: 'Angariação contínua e anúncios de cada imóvel, com origens separadas.', overview: 'Compradores preparados. Imóveis certos. Uma equipa alinhada.', screening: 'Contactos recebidos e chamadas por validar.', buyers: 'Uma lista única, mesmo quando o imóvel anunciado não é o certo.', properties: 'Angariações, mediação e construção de raiz.', launches: 'Primeiro a lista. Depois o mercado.', partners: 'A rede que traz os próximos compradores.', referrals: 'Da indicação ao CPCV, com cada prémio acompanhado.', bank: 'Contactos sem enquadramento atual, preservados para acompanhamento.', meta: 'Só a qualidade confirmada pela equipa gera um sinal.' })[tab]}</p></div><div className="heading-actions">
           {['overview', 'screening', 'buyers', 'bank'].includes(tab) && <><button className="secondary" onClick={() => copyLink()}><Copy size={16}/>Formulário</button><button className="primary" onClick={addBuyer}><Plus size={17}/>Novo contacto</button></>}
           {tab === 'properties' && <button className="primary" onClick={() => setEditor({ kind: 'property', data: {} })}><Plus size={17}/>Novo imóvel</button>}
           {tab === 'partners' && <button className="primary" onClick={() => setEditor({ kind: 'partner', data: { kind: 'Profissional', reward: 2000, active: true } })}><Plus size={17}/>Novo parceiro</button>}
           {tab === 'launches' && <button className="primary" disabled={!data.properties.length} onClick={() => setEditor({ kind: 'launch', data: { status: 'Planeado' } })}><Plus size={17}/>Agendar lançamento</button>}
         </div></div>
-        {(tab === 'owners' || tab === 'campaigns') && <AcquisitionWorkspace mode={tab} data={data} save={mutate} busy={busy}/>}
+        {(tab === 'owners' || tab === 'campaigns') && <AcquisitionWorkspace mode={tab} data={data} save={mutate} busy={busy} transport={transport}/>}
+        {tab === 'questions' && <QuestionLibrary data={data} save={mutate} busy={busy}/>}
         {tab === 'overview' && <>
           <div className="metric-band">{[
             { label: 'Compradores qualificados', value: qualified.length, sub: 'Chamada validada', icon: Users, color: 'green' },
@@ -109,7 +113,7 @@ export default function Workspace({ previewData, previewTransport }: { previewDa
           <div className="integration-strip"><Radio size={21}/><div><strong>{data.meta.configured && data.meta.enabled ? 'Meta: integração configurada' : 'Meta: ligação por configurar'}</strong><span>{data.events.filter(e => e.status === 'sent').length} eventos aceites em produção · {data.events.filter(e => ['pending', 'failed'].includes(e.status)).length} em espera</span></div><button className="secondary" onClick={() => navigate('meta')}>Ver integração <ArrowRight size={15}/></button></div>
         </>}
         {['screening', 'buyers', 'bank'].includes(tab) && <>
-          <div className="list-summary"><Badge tone={tab === 'buyers' ? 'green' : 'neutral'}>{selectedBuyers.length} contactos</Badge><span>{tab === 'screening' ? 'Triagem → chamada → qualificação' : tab === 'bank' ? 'Sem envio de sinal de qualidade à Meta' : 'Crédito preparado ou capitais próprios'}</span></div>
+          <div className="list-summary"><Badge tone={tab === 'buyers' ? 'green' : 'neutral'}>{selectedBuyers.length} contactos</Badge><span>{tab === 'screening' ? 'Triagem → chamada → qualificação' : tab === 'bank' ? 'Sem envio de sinal de qualidade à Meta' : 'Critérios confirmados na chamada'}</span></div>
           <div className="filterbar"><label className="search-field"><Search size={17}/><input aria-label="Pesquisar compradores" value={search} onChange={e => setSearch(e.target.value)} placeholder="Nome, telefone ou localização"/></label><select aria-label="Filtrar origem" value={source} onChange={e => setSource(e.target.value)}>{['Todas as origens', ...SOURCES].map(s => <option key={s}>{s}</option>)}</select><select aria-label="Filtrar etapa" value={stage} onChange={e => setStage(e.target.value)}>{['Todas as etapas', ...BUYER_STAGES].map(s => <option key={s}>{s}</option>)}</select></div>
           <div className="table-wrap"><table className="buyer-table"><thead><tr><th>Comprador</th><th>Procura</th><th>Orçamento</th><th>Financiamento</th><th>Origem</th><th>Etapa</th><th>Responsável</th><th/></tr></thead><tbody>{selectedBuyers.map(b => <tr key={b.id}><td><button className="name-button" onClick={() => openBuyer(b)}><span className="avatar">{b.name[0]}</span><span><strong>{b.name}</strong><small>{b.phone}</small></span></button></td><td>{b.propertyTypes.join(', ') || 'Por definir'}<small>{b.zones.join(', ') || 'Zona por definir'}</small></td><td className="numeric">{b.budget ? money(b.budget) : 'Por definir'}</td><td><Badge tone={['Aprovado', 'Pré-aprovado', 'Capitais próprios'].includes(b.financeStatus) ? 'green' : 'amber'}>{b.financeStatus}</Badge></td><td>{b.source}</td><td><Badge tone={isValidated(b) ? 'green' : 'neutral'}>{b.stage}</Badge></td><td>{userLabel(b.assignedTo)}</td><td><button className="icon-button" title={`Abrir ${b.name}`} aria-label={`Abrir ${b.name}`} onClick={() => openBuyer(b)}><ArrowUpRight size={18}/></button></td></tr>)}</tbody></table>{!selectedBuyers.length && <Empty title="Nenhum contacto nesta lista" detail={search ? 'Não foram encontrados resultados para a pesquisa.' : undefined}/>}</div>
         </>}

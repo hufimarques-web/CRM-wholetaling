@@ -18,9 +18,24 @@ export const OWNER_QUESTIONS = [
   { key: 'mediation', label: 'Quer conhecer um serviço de mediação para vender o imóvel?' }
 ];
 export const OWNER_STAGES = ['Novo', 'A contactar', 'Qualificado', 'Reunião marcada', 'Contrato assinado', 'Base de informação'];
+export const DEFAULT_QUESTION_IDS = { Compradores: 'questions-buyers-v1', Angariação: 'questions-owners-v1' };
+export function defaultQuestionSnapshot(kind) {
+  return { name: kind === 'Angariação' ? 'Angariação · original' : 'Compradores · original', kind, version: 1,
+    requireBudget: kind !== 'Angariação', requireFinance: kind !== 'Angariação',
+    questions: (kind === 'Angariação' ? OWNER_QUESTIONS : QUESTIONS).map(q => ({ key: q.key, label: q.label, eliminatory: true, passValue: true })) };
+}
+export function questionSnapshot(record, kind = 'Compradores') {
+  return record?.questionSnapshot?.questions ? record.questionSnapshot : defaultQuestionSnapshot(kind);
+}
+export function screenQuestions(record, kind) {
+  const questions = questionSnapshot(record, kind).questions;
+  if (!questions.length || !questions.some(q => q.eliminatory)) return 'Pendente';
+  if (questions.some(q => q.eliminatory && typeof record.answers?.[q.key] === 'boolean' && record.answers[q.key] !== q.passValue)) return 'Não elegível';
+  return questions.every(q => typeof record.answers?.[q.key] === 'boolean') ? 'Elegível' : 'Pendente';
+}
 export function screenOwner(owner) {
-  if (OWNER_QUESTIONS.some(q => owner.answers?.[q.key] === false)) return 'Não elegível';
-  return OWNER_QUESTIONS.every(q => owner.answers?.[q.key] === true) && owner.zone && owner.propertyType ? 'Elegível' : 'Pendente';
+  const result = screenQuestions(owner, 'Angariação');
+  return result !== 'Elegível' ? result : owner.zone && owner.propertyType ? 'Elegível' : 'Pendente';
 }
 export function ownerCanSend(owner) {
   return screenOwner(owner) === 'Elegível' && !!owner.callValidatedAt && !!owner.qualifiedAt && owner.stage !== 'Base de informação' && owner.marketingConsent === true && !!owner.consentAt && owner.consentVersion === CONSENT_VERSION;
@@ -30,11 +45,10 @@ export function routeMatches(event, campaign) {
 }
 
 export function screenBuyer(buyer) {
-  const answers = buyer.answers || {};
-  if (QUESTIONS.some(q => answers[q.key] === false)) return 'Não elegível';
-  if (!QUESTIONS.every(q => answers[q.key] === true)) return 'Pendente';
-  if (!(buyer.budget > 0) || !buyer.zones?.length || !buyer.propertyTypes?.length) return 'Pendente';
-  return ['Pré-aprovado', 'Aprovado', 'Capitais próprios'].includes(buyer.financeStatus) ? 'Elegível' : 'Pendente';
+  const result = screenQuestions(buyer, 'Compradores'), rules = questionSnapshot(buyer);
+  if (result !== 'Elegível') return result;
+  if ((rules.requireBudget && !(buyer.budget > 0)) || !buyer.zones?.length || !buyer.propertyTypes?.length) return 'Pendente';
+  return !rules.requireFinance || ['Pré-aprovado', 'Aprovado', 'Capitais próprios'].includes(buyer.financeStatus) ? 'Elegível' : 'Pendente';
 }
 
 export function isValidated(buyer) {

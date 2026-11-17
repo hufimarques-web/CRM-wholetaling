@@ -44,7 +44,7 @@ export async function dispatchMeta(db: any, limit = 10, fetcher = fetch, env = p
     const contact = event.ownerId ? await db.ownerLead.findUnique({ where: { id: event.ownerId } }) : await db.buyerProfile.findUnique({ where: { id: event.buyerId } });
     const origin = event.ownerId ? contact : await db.buyerAcquisition.findUnique({ where: { id: event.acquisitionId } });
     const eligible = event.ownerId ? contact && ownerCanSend(contact) && contact.campaignId === campaign.id
-      : contact && canSendMeta(contact) && origin && origin.buyerId === contact.id && origin.campaignId === campaign.id && origin.screening === 'Elegível' && origin.consentAt && origin.consentVersion === contact.consentVersion && new Date(contact.callValidatedAt) >= new Date(origin.createdAt);
+      : contact && canSendMeta(contact) && origin && (!origin.questionVersionId || origin.questionVersionId === contact.questionVersionId) && origin.buyerId === contact.id && origin.campaignId === campaign.id && origin.screening === 'Elegível' && origin.consentAt && origin.consentVersion === contact.consentVersion && new Date(contact.callValidatedAt) >= new Date(origin.createdAt);
     if (!eligible) { await finish({ status: 'cancelled', lastError: 'Sem qualificação ou autorização válida para esta página.' }); continue; }
     if (Date.now() - new Date(event.eventTime).getTime() > 7 * 86400000) { await finish({ status: 'expired', lastError: 'Evento com mais de 7 dias. A data original foi preservada.' }); continue; }
     try {

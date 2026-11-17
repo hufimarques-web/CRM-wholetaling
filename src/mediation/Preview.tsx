@@ -1,8 +1,10 @@
 'use client';
 import Workspace from './Workspace';
 import type { MediationData } from './types';
+import { defaultQuestionSnapshot, DEFAULT_QUESTION_IDS } from './domain.mjs';
 const stamp = '2026-11-17T12:00:00.000Z';
 const fixture: MediationData = {
+  questionSets: ['Compradores', 'Angariação'].map(kind => ({ id: DEFAULT_QUESTION_IDS[kind].replace('-v1', ''), name: defaultQuestionSnapshot(kind).name, kind, active: true, versions: [{ id: DEFAULT_QUESTION_IDS[kind], setId: DEFAULT_QUESTION_IDS[kind].replace('-v1', ''), version: 1, snapshot: defaultQuestionSnapshot(kind), createdAt: stamp }] })),
   buyers: [
     { id:'demo-b1',name:'Comprador exemplo A',phone:'+351900000001',source:'Meta Ads',zones:['Aveiro'],propertyTypes:['Apartamento'],budget:240000,bedrooms:2,timeframe:'Até 3 meses',financeStatus:'Pré-aprovado',answers:{intent:true,area:true,budget:true,finance:true},screening:'Elegível',stage:'Qualificado',assignedTo:'Hugo',notes:'Dados fictícios de pré-visualização.',callValidatedAt:stamp,qualifiedAt:stamp,depositConfirmed:false,marketingConsent:false,attribution:{},createdAt:stamp,updatedAt:stamp},
     { id:'demo-b2',name:'Comprador exemplo B',phone:'+351900000002',source:'Parceiro profissional',zones:['Ílhavo'],propertyTypes:['Moradia'],budget:300000,bedrooms:3,timeframe:'3 a 6 meses',financeStatus:'Em análise',answers:{intent:true,area:true,budget:true,finance:null},screening:'Pendente',stage:'Novo',assignedTo:'Queirós',notes:'Dados fictícios.',depositConfirmed:false,marketingConsent:false,attribution:{},createdAt:stamp,updatedAt:stamp}
@@ -15,5 +17,6 @@ const fixture: MediationData = {
   partners:[{id:'demo-partner',code:'demo',name:'Parceiro exemplo',phone:'',kind:'Profissional',specialty:'Intermediação de crédito',reward:2000,active:true,notes:''}],
   referrals:[],events:[],legacyOwners:[],legacyBuyers:[],meta:{configured:false,enabled:false,testMode:false,pixelId:null,missing:['Pixel e token']}
 };
-async function transport(action?: string) { if (!action) return fixture; if(action==='audit')return {history:[]}; throw new Error('Pré-visualização: não são guardados dados nem enviados eventos.'); }
+fixture.questionSets.push({id:'demo-land-questions',name:'Compradores · terrenos',kind:'Compradores',active:true,versions:[{id:'demo-land-v1',version:1,createdAt:stamp,snapshot:{name:'Compradores · terrenos',kind:'Compradores',version:1,requireBudget:true,requireFinance:false,questions:[{key:'land',label:'Procura um terreno para construir?',eliminatory:true,passValue:true},{key:'project',label:'Já tem um projeto de arquitetura?',eliminatory:false,passValue:true}]}}]});
+async function transport(action?: string) { if (!action) return fixture; if(action==='audit')return {history:[]}; if(action==='questionHistory')return {history:[{id:'demo-history',snapshot:defaultQuestionSnapshot('Compradores'),answers:{intent:true,area:true,budget:true,finance:true},createdAt:stamp,actor:'Hugo'}]}; throw new Error('Pré-visualização: não são guardados dados nem enviados eventos.'); }
 export default function Preview(){return <Workspace previewData={fixture} previewTransport={transport}/>;}

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { saveOwner } from '@/mediation/owners';
 import { CONSENT_VERSION, OWNER_QUESTIONS } from '@/mediation/domain.mjs';
 import { InputError, str } from '@/mediation/validation';
+import { resolveQuestions, validateQuestionAnswers } from '@/mediation/questions';
 export const runtime = 'nodejs';
 const reply = (body: any, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 export async function POST(req: Request) {
@@ -14,11 +15,13 @@ export async function POST(req: Request) {
     const raw = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     if (raw.website || typeof raw.startedAt !== 'number' || Date.now() - raw.startedAt < 2500 || Date.now() - raw.startedAt > 86400000) throw new InputError('Atualize o formulário e tente novamente.');
     if (raw.contactRequested !== true || raw.privacyVersion !== CONSENT_VERSION) throw new InputError('Confirme o pedido de contacto.');
-    if (OWNER_QUESTIONS.some(q => typeof raw.answers?.[q.key] !== 'boolean')) throw new InputError('Responda a todas as perguntas.');
     const page = raw.campaignSlug ? await prisma.adCampaign.findUnique({ where: { slug: str(raw.campaignSlug, 80) } }) : null;
     if (raw.campaignSlug && (!page?.published || page.kind !== 'Angariação')) throw new InputError('Esta página não está disponível.');
+    const questions = await resolveQuestions(prisma, 'Angariação', page?.questionVersionId);
+    if (raw.questionVersionId !== questions.questionVersionId) throw new InputError('As perguntas desta página mudaram. Atualize o formulário antes de enviar.', 409);
+    const answers = validateQuestionAnswers(raw.answers, questions.questionSnapshot, true);
     if (await prisma.ownerLead.count({ where: { createdAt: { gte: new Date(Date.now() - 3600000) } } }) >= 100) return reply({ error: 'Tente novamente mais tarde.' }, 429);
     return reply(await saveOwner(prisma, { name: raw.name, phone: raw.phone, email: raw.email, zone: raw.zone, propertyType: raw.propertyType,
-      askingPrice: raw.askingPrice, answers: raw.answers, marketingConsent: raw.marketingConsent === true, attribution: raw.attribution, campaignId: page?.id }, 'Formulário de angariação', true));
+      askingPrice: raw.askingPrice, answers, questionVersionId: questions.questionVersionId, marketingConsent: raw.marketingConsent === true, attribution: raw.attribution, campaignId: page?.id }, 'Formulário de angariação', true));
   } catch (e) { return reply({ error: e instanceof InputError ? e.message : 'Não foi possível confirmar o pedido. Tente novamente.' }, e instanceof InputError ? e.status : 503); }
 }

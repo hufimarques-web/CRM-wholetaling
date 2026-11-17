@@ -13,7 +13,19 @@
 
 O objetivo anual é de 65 vendas. A referência 1/200 é a linha de base fornecida pela equipa, não um resultado calculado. O total de vendas conta os compradores marcados como Vendido em 2027; cada apartamento deve ter uma ficha de imóvel separada.
 
-## Páginas públicas
+## Banco de perguntas e histórico
+
+O separador **Banco de perguntas** permite criar, duplicar e editar conjuntos para Compradores ou Angariação. Cada pergunta tem texto, posição e regra: eliminatória com Sim/Não aceite, ou informativa. Os critérios de orçamento e financiamento também são configurados nos conjuntos de compradores. É exigida pelo menos uma pergunta eliminatória.
+
+Editar cria uma nova versão, sem modificar versões anteriores. Em **Páginas e anúncios**, escolher o conjunto e a versão que cada página deve apresentar. As páginas de campanhas ficam presas à versão escolhida até uma alteração explícita. Os formulários gerais `/comprar` e `/angariar` usam a versão mais recente do respetivo conjunto original.
+
+Cada contacto e cada origem de anúncio conserva uma cópia das perguntas, das regras e das respostas recebidas. Na ficha, **Conjunto de perguntas respondido** permite selecionar um conjunto para uma nova avaliação. As respostas ficam por preencher, a validação anterior é retirada e os eventos ainda pendentes são cancelados. Os eventos já enviados não são repetidos. O histórico mostra os textos e respostas tal como foram guardados; trocar perguntas não altera o passado.
+
+Um formulário aberto antes de a página mudar de versão pede atualização antes do envio, para não aplicar regras novas a respostas antigas. Os critérios de aceitação não são incluídos nos dados enviados ao navegador público. Mantém-se a chamada validada e o consentimento antes dos sinais Meta.
+
+`question-bank-v1.sql` acrescenta as versões e o histórico, associa os registos existentes aos conjuntos originais e preserva as respostas. O processo de build aplica esta atualização depois da migração inicial do CRM, uma única vez.
+
+## Páginas públicas e campanhas
 
 - `/angariar`: página geral de apresentação de imóveis, sem destino Meta por defeito.
 - `/comprar`: formulário geral para a lista de compradores e referências.

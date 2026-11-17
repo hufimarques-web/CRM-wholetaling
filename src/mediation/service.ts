@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { buyerInput, InputError, str } from './validation';
 import { screenBuyer, isValidated, CONSENT_VERSION, EVENT_NAMES, eventId, canSendMeta } from './domain.mjs';
 import { queueBuyerEvents, recordAcquisition } from './campaigns';
+import { resolveQuestions, validateQuestionAnswers, recordQuestionResponse } from './questions';
 
 export async function saveBuyer(db: any, raw: Record<string, any>, actor: string, options: { public?: boolean } = {}) {
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -10,7 +11,11 @@ export async function saveBuyer(db: any, raw: Record<string, any>, actor: string
         const old = !options.public && raw.id ? await tx.buyerProfile.findUnique({ where: { id: str(raw.id, 120, true) } }) : null;
         if (raw.id && !options.public && !old) throw new InputError('Comprador não encontrado.', 404);
         if (old && raw.updatedAt !== old.updatedAt.toISOString()) throw new InputError('Este contacto foi atualizado. Atualize a lista antes de guardar.', 409);
-        const input = buyerInput(options.public ? { ...raw, stage: 'Novo', assignedTo: 'Hugo', notes: '', depositConfirmed: false, propertyId: null } : raw, old || {});
+        const questions = await resolveQuestions(tx, 'Compradores', raw.questionVersionId, old);
+        const switched = old && questions.questionVersionId !== old.questionVersionId && !!old.questionVersionId;
+        const answers = validateQuestionAnswers(raw.answers ?? (switched ? {} : old?.answers), questions.questionSnapshot, options.public);
+        const trusted = { ...raw, ...questions, answers };
+        const input = buyerInput(options.public ? { ...trusted, stage: 'Novo', assignedTo: 'Hugo', notes: '', depositConfirmed: false, propertyId: null } : trusted, old || {});
         const duplicate = await tx.buyerProfile.findUnique({ where: { phone: input.phone } });
         if (duplicate && duplicate.id !== old?.id) {
           if (options.public) {
@@ -21,11 +26,11 @@ export async function saveBuyer(db: any, raw: Record<string, any>, actor: string
         }
         const now = new Date();
         const screening = screenBuyer(input);
-        const criteriaChanged = old && (Object.keys(input.answers).some(key => old.answers[key] !== input.answers[key]) || old.financeStatus !== input.financeStatus || old.budget !== input.budget || JSON.stringify(old.zones) !== JSON.stringify(input.zones) || JSON.stringify(old.propertyTypes) !== JSON.stringify(input.propertyTypes));
+        const criteriaChanged = old && (switched || Object.keys(input.answers).some(key => old.answers[key] !== input.answers[key]) || old.financeStatus !== input.financeStatus || old.budget !== input.budget || JSON.stringify(old.zones) !== JSON.stringify(input.zones) || JSON.stringify(old.propertyTypes) !== JSON.stringify(input.propertyTypes));
         let callValidatedAt = criteriaChanged ? null : old?.callValidatedAt || null;
         let callValidatedBy = criteriaChanged ? null : old?.callValidatedBy || null;
         if (!options.public && raw.validateCall === true) {
-          if (screening !== 'Elegível') throw new InputError('Confirme todas as perguntas, critérios de compra e financiamento antes de validar a chamada.');
+          if (screening !== 'Elegível') throw new InputError('Confirme todas as perguntas e os critérios do conjunto selecionado antes de validar a chamada.');
           callValidatedAt = now; callValidatedBy = actor;
         }
         if (screening !== 'Elegível' || raw.revokeValidation === true) { callValidatedAt = null; callValidatedBy = null; }
@@ -53,6 +58,8 @@ export async function saveBuyer(db: any, raw: Record<string, any>, actor: string
           cpcvAt: stage === 'CPCV' ? old?.cpcvAt || now : old?.cpcvAt || null,
           soldAt: stage === 'Vendido' ? old?.soldAt || now : old?.soldAt || null
         } });
+        await recordQuestionResponse(tx, saved, old, 'Compradores', actor);
+        if (switched) await tx.metaConversion.updateMany({ where: { buyerId: saved.id, status: { in: ['pending', 'failed', 'processing'] } }, data: { status: 'cancelled', lockedUntil: null, lastError: 'Conjunto de perguntas alterado. A validação anterior foi retirada.' } });
         if (options.public) await recordAcquisition(tx, saved, { ...raw, ...input, screening });
         if (raw.referralCode && !old) {
           const partner = await tx.referralPartner.findUnique({ where: { code: str(raw.referralCode, 60) } });

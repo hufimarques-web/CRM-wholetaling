@@ -187,6 +187,8 @@ model BuyerProfile {
   timeframe          String   @default("Por confirmar")
   financeStatus      String   @default("Por confirmar")
   answers            Json     @default("{}")
+  questionVersionId  String?
+  questionSnapshot   Json     @default("{}")
   screening          String   @default("Pendente")
   stage              String   @default("Novo")
   assignedTo         String   @default("Hugo")
@@ -301,6 +303,7 @@ model AdCampaign {
   slug        String @unique
   kind        String
   propertyId  String?
+  questionVersionId String?
   headline    String
   description String @default("")
   imageUrl    String @default("")
@@ -323,6 +326,8 @@ model BuyerAcquisition {
   attribution Json @default("{}")
   screening   String @default("Pendente")
   submission  Json @default("{}")
+  questionVersionId String?
+  questionSnapshot Json @default("{}")
   consentAt   DateTime?
   consentVersion String?
   createdAt   DateTime @default(now())
@@ -341,6 +346,8 @@ model OwnerLead {
   propertyType String
   askingPrice Float @default(0)
   answers     Json @default("{}")
+  questionVersionId String?
+  questionSnapshot Json @default("{}")
   screening   String @default("Pendente")
   stage       String @default("Novo")
   notes       String @default("")
@@ -367,5 +374,37 @@ model MediationAudit {
   action     String
   createdAt  DateTime @default(now())
   @@index([entityId, createdAt])
+}
+
+model QuestionSet {
+  id        String @id @default(uuid())
+  name      String
+  kind      String
+  active    Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  versions  QuestionVersion[]
+}
+
+model QuestionVersion {
+  id        String @id @default(uuid())
+  setId     String
+  version   Int
+  snapshot  Json
+  createdAt DateTime @default(now())
+  set       QuestionSet @relation(fields: [setId], references: [id], onDelete: Restrict)
+  @@unique([setId, version])
+}
+
+model QuestionResponse {
+  id        String @id @default(uuid())
+  contactId String
+  kind      String
+  questionVersionId String
+  snapshot  Json
+  answers   Json
+  actor     String
+  createdAt DateTime @default(now())
+  @@index([contactId, createdAt])
 }
 

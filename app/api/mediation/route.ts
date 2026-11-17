@@ -8,6 +8,7 @@ import { InputError, partnerInput, propertyInput, str } from '@/mediation/valida
 import { matchBuyer, rewardEligible } from '@/mediation/domain.mjs';
 import { campaignInput, campaignStatus } from '@/mediation/campaigns';
 import { saveOwner } from '@/mediation/owners';
+import { resolveQuestions, saveQuestionSet } from '@/mediation/questions';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -31,10 +32,11 @@ export async function GET(req: NextRequest) {
     const campaigns = await prisma.adCampaign.findMany({ orderBy: { createdAt: 'desc' } });
     const owners = await prisma.ownerLead.findMany({ orderBy: { updatedAt: 'desc' } });
     const acquisitions = await prisma.buyerAcquisition.findMany({ orderBy: { createdAt: 'desc' } });
+    const questionSets = await prisma.questionSet.findMany({ include: { versions: { orderBy: { version: 'desc' } } }, orderBy: { name: 'asc' } });
     const legacyBuyers = await prisma.mediationBuyer.findMany({ select: { id: true, nome: true, telefone: true, email: true, fase: true, leadId: true }, orderBy: { createdAt: 'desc' } });
     const legacyOwners = await prisma.lead.findMany({ where: { isDemo: false, id: { notIn: properties.map(p => p.legacyLeadId).filter(Boolean) as string[] } },
       select: { id: true, nomeProprietario: true, telefone: true, tipoImovel: true, moradaZona: true, freguesia: true, mediacaoPrecoVenda: true, valorMinimoAbsoluto: true }, orderBy: { createdAt: 'desc' } });
-    return reply({ buyers, properties, partners, referrals, launches, events, legacyOwners, legacyBuyers, owners, acquisitions,
+    return reply({ buyers, properties, partners, referrals, launches, events, legacyOwners, legacyBuyers, owners, acquisitions, questionSets,
       campaigns: campaigns.map(c => ({ ...c, integration: campaignStatus(c) })), meta: metaStatus(campaigns) });
   } catch (error) { return failure(error); }
 }
@@ -46,15 +48,18 @@ export async function POST(req: NextRequest) {
     const text = await req.text();
     if (text.length > 25000) throw new InputError('Pedido demasiado grande.', 413);
     const { action, data = {} } = JSON.parse(text);
+    if (action === 'saveQuestionSet') return reply({ version: await saveQuestionSet(prisma, data, actor) });
+    if (action === 'questionHistory') return reply({ history: await prisma.questionResponse.findMany({ where: { contactId: str(data.id, 120, true) }, orderBy: { createdAt: 'desc' }, take: 100 }) });
     if (action === 'saveCampaign') {
       const values = campaignInput(data), id = str(data.id, 120);
+      const questions = await resolveQuestions(prisma, values.kind === 'Angariação' ? 'Angariação' : 'Compradores', data.questionVersionId);
       if (values.propertyId && !await prisma.brokerageProperty.findUnique({ where: { id: values.propertyId } })) throw new InputError('Selecione um imóvel existente.');
       if (id) {
         const old = await prisma.adCampaign.findUnique({ where: { id } });
         if (!old) throw new InputError('Página não encontrada.', 404);
         if ((old.pixelId && old.pixelId !== values.pixelId) || old.kind !== values.kind || old.propertyId !== values.propertyId) throw new InputError('Crie outra página para mudar o Pixel, o tipo ou o imóvel. A origem dos contactos existentes deve ser preservada.');
       }
-      const campaign = id ? await prisma.adCampaign.update({ where: { id }, data: values }) : await prisma.adCampaign.create({ data: values });
+      const campaign = id ? await prisma.adCampaign.update({ where: { id }, data: { ...values, questionVersionId: questions.questionVersionId } }) : await prisma.adCampaign.create({ data: { ...values, questionVersionId: questions.questionVersionId } });
       return reply({ campaign });
     }
     if (action === 'saveOwner') { const owner = await saveOwner(prisma, data, actor); await dispatchMeta(prisma, 3).catch(() => {}); return reply({ owner }); }

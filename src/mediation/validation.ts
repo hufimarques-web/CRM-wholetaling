@@ -1,4 +1,4 @@
-import { BUYER_STAGES, FINANCE_STATES, PROPERTY_STAGES, PROPERTY_TYPES, QUESTIONS, SOURCES, normalizePhone } from './domain.mjs';
+import { BUYER_STAGES, FINANCE_STATES, PROPERTY_STAGES, PROPERTY_TYPES, SOURCES, normalizePhone, questionSnapshot } from './domain.mjs';
 
 export class InputError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -42,7 +42,7 @@ export function buyerInput(raw: Record<string, any>, old: Record<string, any> = 
   const email = str(b.email, 254);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new InputError('Email inválido.');
   const answers: Record<string, boolean | null> = {};
-  for (const q of QUESTIONS) {
+  for (const q of questionSnapshot(b).questions) {
     const answer = b.answers?.[q.key];
     if (answer !== undefined && answer !== null && typeof answer !== 'boolean') throw new InputError('Confirme as respostas de qualificação.');
     answers[q.key] = answer ?? null;
@@ -60,6 +60,7 @@ export function buyerInput(raw: Record<string, any>, old: Record<string, any> = 
     source: choice(b.source, SOURCES, 'Direto'), zones: strings(b.zones || []), propertyTypes,
     budget: num(b.budget), bedrooms, timeframe: str(b.timeframe || 'Por confirmar', 100),
     financeStatus: choice(b.financeStatus, FINANCE_STATES, 'Por confirmar'), answers,
+    questionVersionId: b.questionVersionId, questionSnapshot: questionSnapshot(b),
     stage: choice(b.stage, BUYER_STAGES, 'Novo'), assignedTo: choice(b.assignedTo, ['Hugo', 'Queirós'], 'Hugo'),
     notes: str(b.notes, 10000), nextContactAt: date, propertyId: str(b.propertyId, 120) || null,
     depositConfirmed: b.depositConfirmed === true, marketingConsent: b.marketingConsent === true,

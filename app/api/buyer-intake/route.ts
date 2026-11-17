@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { saveBuyer } from '@/mediation/service';
 import { attribution, InputError, str } from '@/mediation/validation';
 import { CONSENT_VERSION } from '@/mediation/domain.mjs';
+import { resolveQuestions, validateQuestionAnswers } from '@/mediation/questions';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -19,16 +20,18 @@ export async function POST(req: Request) {
     const raw = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     if (raw.website || typeof raw.startedAt !== 'number' || Date.now() - raw.startedAt < 2500 || Date.now() - raw.startedAt > 86400000) throw new InputError('Atualize o formulário e tente novamente.');
     if (raw.contactRequested !== true || raw.privacyVersion !== CONSENT_VERSION) throw new InputError('Confirme o pedido de contacto.');
-    if (!raw.answers || ['intent', 'area', 'budget', 'finance'].some(key => typeof raw.answers[key] !== 'boolean')) throw new InputError('Responda às quatro perguntas.');
     const campaign = raw.marketingConsent === true ? attribution(raw.attribution) : {};
     const page = raw.campaignSlug ? await prisma.adCampaign.findUnique({ where: { slug: str(raw.campaignSlug, 80) } }) : null;
     if (raw.campaignSlug && (!page || !page.published || page.kind !== 'Imóvel')) throw new InputError('Esta página não está disponível.');
+    const questions = await resolveQuestions(prisma, 'Compradores', page?.questionVersionId);
+    if (raw.questionVersionId !== questions.questionVersionId) throw new InputError('As perguntas desta página mudaram. Atualize o formulário antes de enviar.', 409);
+    const answers = validateQuestionAnswers(raw.answers, questions.questionSnapshot, true);
     const recent = await prisma.buyerProfile.count({ where: { createdAt: { gte: new Date(Date.now() - 3600000) } } });
     if (recent >= 100) return reply({ error: 'Recebemos muitos pedidos. Tente novamente mais tarde.' }, 429);
     // Public answers cannot validate a call, select a stage or overwrite an existing buyer.
     const data = { name: raw.name, phone: raw.phone, email: raw.email, zones: raw.zones,
       propertyTypes: raw.propertyTypes, budget: raw.budget, bedrooms: raw.bedrooms, timeframe: raw.timeframe,
-      financeStatus: raw.financeStatus, answers: raw.answers, marketingConsent: raw.marketingConsent === true,
+      financeStatus: raw.financeStatus, answers, questionVersionId: questions.questionVersionId, marketingConsent: raw.marketingConsent === true,
       attribution: campaign, referralCode: str(raw.referralCode, 60), campaignId: page?.id,
       source: raw.source === 'Meta Ads' || campaign.fbclid || campaign.lead_id || /facebook|instagram|meta/i.test(campaign.utm_source || '') ? 'Meta Ads' : 'Direto' };
     return reply(await saveBuyer(prisma, data, 'Formulário de compradores', { public: true }));

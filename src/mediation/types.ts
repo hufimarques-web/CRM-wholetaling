@@ -1,4 +1,5 @@
 export interface Buyer {
+  questionVersionId?: string; questionSnapshot?: any;
   id: string; name: string; phone: string; email?: string; source: string; zones: string[];
   propertyTypes: string[]; budget: number; bedrooms: number; timeframe: string;
   financeStatus: string; answers: Record<string, boolean | null>; screening: string;
@@ -28,6 +29,7 @@ export interface Conversion {
   attempts: number; lastError?: string; sentAt?: string;
 }
 export interface MediationData {
+  questionSets: any[];
   owners: any[]; campaigns: any[]; acquisitions: any[]; legacyBuyers: any[];
   buyers: Buyer[]; properties: Property[]; partners: Partner[]; referrals: Referral[];
   launches: Launch[]; events: Conversion[];

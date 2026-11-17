@@ -31,7 +31,7 @@ export async function recordAcquisition(tx: any, buyer: any, raw: any) {
   if (!campaign || campaign.kind !== 'Imóvel' || !campaign.published) throw new InputError('Esta página já não está disponível.');
   // First contact with each campaign is immutable; repeated submissions cannot rewrite attribution or consent.
   await tx.buyerAcquisition.upsert({ where: { buyerId_campaignId: { buyerId: buyer.id, campaignId: campaign.id } },
-    create: { buyerId: buyer.id, campaignId: campaign.id, screening: raw.screening,
+    create: { buyerId: buyer.id, campaignId: campaign.id, screening: raw.screening, questionVersionId: raw.questionVersionId, questionSnapshot: raw.questionSnapshot,
       submission: { answers: raw.answers, budget: raw.budget, zones: raw.zones, propertyTypes: raw.propertyTypes, financeStatus: raw.financeStatus },
       attribution: raw.marketingConsent ? raw.attribution : {}, consentAt: raw.marketingConsent ? new Date() : null,
       consentVersion: raw.marketingConsent ? CONSENT_VERSION : null }, update: {} });
@@ -41,6 +41,7 @@ export async function queueBuyerEvents(tx: any, buyer: any, now: Date) {
   if (!canSendMeta(buyer)) return;
   const origins = await tx.buyerAcquisition.findMany({ where: { buyerId: buyer.id }, include: { campaign: true } });
   for (const origin of origins) {
+    if (origin.questionVersionId && origin.questionVersionId !== buyer.questionVersionId) continue;
     if (origin.screening !== 'Elegível' || !origin.consentAt || origin.consentVersion !== buyer.consentVersion || new Date(buyer.callValidatedAt) < origin.createdAt) continue;
     const campaign = origin.campaign;
     if (!campaign.pixelId) continue;

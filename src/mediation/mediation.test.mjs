@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { screenBuyer, canSendMeta, screenOwner, ownerCanSend, matchBuyer, rewardEligible, CONSENT_VERSION, routeMatches } from './domain.mjs';
+import { screenBuyer, canSendMeta, screenOwner, ownerCanSend, matchBuyer, rewardEligible, CONSENT_VERSION, routeMatches, defaultQuestionSnapshot, DEFAULT_QUESTION_IDS } from './domain.mjs';
+import { questionSetInput, saveQuestionSet, resolveQuestions, validateQuestionAnswers, publicQuestions } from './questions.ts';
 import { saveBuyer } from './service.ts';
 import { saveOwner } from './owners.ts';
 import { campaignInput, campaignStatus, queueBuyerEvents } from './campaigns.ts';
@@ -11,15 +12,17 @@ const buyer = () => ({ name:'Pessoa de teste', phone:'912345678', email:'test@ex
 const owner = () => ({ name:'Proprietário de teste', phone:'913456789', zone:'Aveiro', propertyType:'Moradia', answers:{contact:true,authority:true,area:true,mediation:true}, marketingConsent:true });
 const campaign = (id, kind='Imóvel') => ({ id, kind, published:true, enabled:true, propertyId:`property-${id}`, pixelId:id==='a'?'11111111':'22222222', tokenEnv:`META_TOKEN_${id.toUpperCase()}`, testCode:'' });
 function memory() {
-  const tables={buyerProfile:[],ownerLead:[],buyerAcquisition:[],metaConversion:[],adCampaign:[campaign('a'),campaign('b'),campaign('o','Angariação')],brokerageProperty:[{id:'property-a'},{id:'property-b'}],referralPartner:[],referral:[],mediationAudit:[]};
+  const tables={buyerProfile:[],ownerLead:[],buyerAcquisition:[],metaConversion:[],adCampaign:[campaign('a'),campaign('b'),campaign('o','Angariação')],brokerageProperty:[{id:'property-a'},{id:'property-b'}],referralPartner:[],referral:[],mediationAudit:[],questionSet:[],questionVersion:[],questionResponse:[]};
+  for(const kind of ['Compradores','Angariação']) { const id=DEFAULT_QUESTION_IDS[kind],setId=id.replace('-v1','');tables.questionSet.push({id:setId,kind,name:defaultQuestionSnapshot(kind).name,active:true});tables.questionVersion.push({id,setId,version:1,snapshot:defaultQuestionSnapshot(kind)}); }
   const eq=(row,where={})=>Object.entries(where).every(([k,v])=> k==='OR'?v.some(w=>eq(row,w)): k==='buyerId_campaignId'?eq(row,v): v && typeof v==='object' && !(v instanceof Date)? ('in'in v?v.in.includes(row[k]):'lte'in v?row[k]<=v.lte:'lt'in v?row[k]<v.lt:false) : row[k] instanceof Date && v instanceof Date ? +row[k]===+v : row[k]===v);
   const db={tables,$transaction:async fn=>fn(db)};
+  const included=(r,opts={})=>!r?null:structuredClone({...r,...(opts.include?.set?{set:tables.questionSet.find(s=>s.id===r.setId)}:{}),...(opts.include?.versions?{versions:tables.questionVersion.filter(v=>v.setId===r.id).sort((a,b)=>b.version-a.version).slice(0,opts.include.versions.take||Infinity)}:{})});
   for(const name of Object.keys(tables)) db[name]={
-    findUnique:async({where})=>tables[name].find(r=>eq(r,where))||null,
-    findFirst:async({where})=>tables[name].find(r=>eq(r,where))||null,
+    findUnique:async(opts)=>included(tables[name].find(r=>eq(r,opts.where)),opts),
+    findFirst:async(opts)=>{let rows=tables[name].filter(r=>eq(r,opts.where));if(opts.orderBy?.version)rows.sort((a,b)=>b.version-a.version);if(opts.orderBy?.createdAt)rows.reverse();return included(rows[0],opts);},
     findMany:async(opts={})=>tables[name].filter(r=>eq(r,opts.where)).slice(0,opts.take||Infinity).map(r=>({...r,...(opts.include?.campaign?{campaign:tables.adCampaign.find(c=>c.id===r.campaignId)}:{})})),
     create:async({data})=>{const r={id:`${name}-${tables[name].length}`,createdAt:new Date(),updatedAt:new Date(),status:'pending',attempts:0,nextAttempt:new Date(),lockedUntil:null,...data};tables[name].push(r);return r;},
-    update:async({where,data})=>{const r=tables[name].find(r=>eq(r,where));Object.assign(r,data,{updatedAt:new Date()});return r;},
+    update:async({where,data})=>{const r=tables[name].find(r=>eq(r,where));Object.assign(r,data,{updatedAt:new Date()});return structuredClone(r);},
     updateMany:async({where,data})=>{const rows=tables[name].filter(r=>eq(r,where));for(const r of rows) for(const [k,v]of Object.entries(data))r[k]=v?.increment?r[k]+v.increment:v;return{count:rows.length};},
     upsert:async({where,create,update})=>{const r=tables[name].find(r=>eq(r,where));return r?db[name].update({where,data:update}):db[name].create({data:create});}
   };
@@ -91,4 +94,49 @@ test('sem configuração, sem consentimento ou com troca de Pixel não faz pedid
  const no=async()=>assert.fail('network must not be called');await dispatchMeta(db,5,no,{});
  db.tables.adCampaign[0].pixelId='33333333';await dispatchMeta(db,5,no,{META_TOKEN_A:'a'});assert.equal(db.tables.metaConversion[0].attempts,0);
  db.tables.adCampaign[0].pixelId='11111111';b.marketingConsent=false;await dispatchMeta(db,5,no,{META_TOKEN_A:'a'});assert.equal(db.tables.metaConversion[0].status,'cancelled');
+});
+
+test('biblioteca cria versões imutáveis; contactos anteriores conservam regras e respostas',async()=>{
+ const db=memory();await saveBuyer(db,{...buyer(),campaignId:'a'},'public',{public:true});
+ const original=structuredClone(db.tables.buyerProfile[0]),originalVersion=structuredClone(db.tables.questionVersion[0]);
+ const snapshot=defaultQuestionSnapshot('Compradores');snapshot.questions[1].passValue=false;snapshot.questions[1].label='Procura fora da região de Aveiro?';
+ const v2=await saveQuestionSet(db,{...snapshot,id:'questions-buyers',baseVersionId:'questions-buyers-v1'},'Hugo');
+ assert.equal(v2.version,2);assert.deepEqual(db.tables.questionVersion[0],originalVersion);assert.deepEqual(db.tables.buyerProfile[0],original);
+ assert.equal(screenBuyer(original),'Elegível');assert.equal(screenBuyer({...original,questionSnapshot:v2.snapshot}),'Não elegível');
+ assert.equal((await resolveQuestions(db,'Compradores')).questionVersionId,v2.id);
+ assert.equal((await resolveQuestions(db,'Compradores',undefined,original)).questionVersionId,'questions-buyers-v1');
+ await assert.rejects(saveQuestionSet(db,{...snapshot,id:'questions-buyers',baseVersionId:'questions-buyers-v1'},'Hugo'),/mudou/);
+});
+test('trocar conjunto retira validação, cancela pendentes e guarda histórico sem reinterpretar respostas',async()=>{
+ const db=memory();await saveBuyer(db,{...buyer(),campaignId:'a'},'public',{public:true});let b=db.tables.buyerProfile[0];
+ await saveBuyer(db,{...b,updatedAt:b.updatedAt.toISOString(),validateCall:true},'Hugo');
+ const second=await saveQuestionSet(db,{name:'Procura de terrenos',kind:'Compradores',requireBudget:false,requireFinance:false,questions:[{key:'land',label:'Quer comprar um terreno?',eliminatory:true,passValue:true}]},'Hugo');
+ b=db.tables.buyerProfile[0];await saveBuyer(db,{id:b.id,updatedAt:b.updatedAt.toISOString(),questionVersionId:second.id},'Hugo');
+ b=db.tables.buyerProfile[0];assert.equal(b.callValidatedAt,null);assert.equal(b.stage,'Novo');assert.deepEqual(b.answers,{land:null});assert.equal(db.tables.metaConversion[0].status,'cancelled');
+ const history=db.tables.questionResponse;assert.equal(history.length,2);assert.equal(history[0].questionVersionId,'questions-buyers-v1');assert.equal(history[0].answers.intent,true);assert.equal(history[1].questionVersionId,second.id);
+ await saveBuyer(db,{id:b.id,updatedAt:b.updatedAt.toISOString(),answers:{land:true},validateCall:true,budget:0,financeStatus:'Por confirmar'},'Hugo');
+ assert.equal(db.tables.buyerProfile[0].stage,'Qualificado');assert.equal(db.tables.metaConversion.length,1,'outro conjunto não gera um sinal para a campanha antiga');
+});
+test('pergunta com Não aceite e pergunta informativa funcionam; critérios adicionais são configuráveis',()=>{
+ const snapshot={name:'Proprietários',kind:'Angariação',version:1,questions:[{key:'exclusive',label:'Tem contrato exclusivo ativo?',eliminatory:true,passValue:false},{key:'photos',label:'Tem fotografias?',eliminatory:false,passValue:true}]};
+ assert.equal(screenOwner({...owner(),questionSnapshot:snapshot,answers:{exclusive:false,photos:false}}),'Elegível');
+ assert.equal(screenOwner({...owner(),questionSnapshot:snapshot,answers:{exclusive:true,photos:false}}),'Não elegível');
+ assert.equal(screenOwner({...owner(),questionSnapshot:snapshot,answers:{exclusive:false}}),'Pendente');
+ assert.throws(()=>validateQuestionAnswers({exclusive:false,unexpected:true},snapshot,true),/não correspondem/);
+ assert.throws(()=>validateQuestionAnswers({exclusive:false},snapshot,true),/todas/);
+ assert.throws(()=>questionSetInput({...snapshot,questions:[]}),/1 e 20/);
+ assert.throws(()=>questionSetInput({...snapshot,questions:[snapshot.questions[0],snapshot.questions[0]]}),/diferente/);
+});
+test('versão de angariação não pode ser aplicada a comprador e regras não são expostas no formulário público',async()=>{
+ const db=memory();await assert.rejects(resolveQuestions(db,'Compradores','questions-owners-v1'),/adequado/);
+ const resolved=await resolveQuestions(db,'Angariação');const publicForm=publicQuestions(resolved);
+ assert.ok(publicForm.versionId);assert.equal(publicForm.questions[0].label,resolved.questionSnapshot.questions[0].label);
+ assert.equal(publicForm.questions[0].passValue,undefined);assert.equal(publicForm.questions[0].eliminatory,undefined);
+});
+test('cada origem guarda o seu conjunto mesmo quando o comprador responde a páginas diferentes',async()=>{
+ const db=memory();await saveBuyer(db,{...buyer(),campaignId:'a'},'public',{public:true});
+ const v=await saveQuestionSet(db,{name:'Compradores de terreno',kind:'Compradores',requireBudget:false,requireFinance:false,questions:[{key:'land',label:'Procura terreno?',eliminatory:true,passValue:true}]},'Hugo');
+ await saveBuyer(db,{...buyer(),campaignId:'b',questionVersionId:v.id,answers:{land:true}},'public',{public:true});
+ assert.equal(db.tables.buyerProfile.length,1);assert.equal(db.tables.buyerProfile[0].questionVersionId,'questions-buyers-v1');
+ assert.equal(db.tables.buyerAcquisition[0].questionVersionId,'questions-buyers-v1');assert.equal(db.tables.buyerAcquisition[1].questionVersionId,v.id);assert.deepEqual(db.tables.buyerAcquisition[1].submission.answers,{land:true});
 });

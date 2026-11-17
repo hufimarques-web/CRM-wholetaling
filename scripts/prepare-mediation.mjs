@@ -8,15 +8,18 @@ if (process.env.VERCEL_ENV !== 'production' && process.env.MEDIATION_MIGRATE !==
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required for the mediation migration.');
 const db = new PrismaClient();
 try {
-  const sql = await readFile(new URL('../prisma/mediation-2027.sql', import.meta.url), 'utf8');
-  if (/DROP\s+(TABLE|COLUMN)|DELETE\s+FROM|TRUNCATE/i.test(sql)) throw new Error('Destructive migration rejected.');
+  const migrations = [['mediation-2027-v1','mediation-2027.sql'], ['question-bank-v1','question-bank-v1.sql']];
   await db.$transaction(async tx => {
     await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock(1772027)");
     await tx.$executeRawUnsafe('CREATE TABLE IF NOT EXISTS "_AHMigration" ("name" TEXT PRIMARY KEY, "appliedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)');
-    const done = await tx.$queryRawUnsafe('SELECT "name" FROM "_AHMigration" WHERE "name" = $1', 'mediation-2027-v1');
-    if (done.length) return;
-    for (const statement of sql.split(';').map(s => s.trim()).filter(Boolean)) await tx.$executeRawUnsafe(statement);
-    await tx.$executeRawUnsafe('INSERT INTO "_AHMigration" ("name") VALUES ($1)', 'mediation-2027-v1');
+    for (const [name, file] of migrations) {
+      const done = await tx.$queryRawUnsafe('SELECT "name" FROM "_AHMigration" WHERE "name" = $1', name);
+      if (done.length) continue;
+      const sql = await readFile(new URL(`../prisma/${file}`, import.meta.url), 'utf8');
+      if (/DROP\s+(TABLE|COLUMN)|DELETE\s+FROM|TRUNCATE/i.test(sql)) throw new Error('Destructive migration rejected.');
+      for (const statement of sql.split(';').map(s => s.trim()).filter(Boolean)) await tx.$executeRawUnsafe(statement);
+      await tx.$executeRawUnsafe('INSERT INTO "_AHMigration" ("name") VALUES ($1)', name);
+    }
   }, { timeout: 60000, maxWait: 30000 });
   console.log('Mediation migration ready. Existing tables and records preserved.');
 } catch (e) {
