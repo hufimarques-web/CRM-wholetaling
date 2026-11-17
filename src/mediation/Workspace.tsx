@@ -9,6 +9,7 @@ import { AcquisitionWorkspace } from './acquisition-ui';
 import { QuestionLibrary } from './question-ui';
 import './questions.css';
 import './navigation.css';
+import './studio.css';
 
 export const money = (n: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0);
 export const date = (value?: string) => value ? new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value)) : '—';
