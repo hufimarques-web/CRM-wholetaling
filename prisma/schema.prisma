@@ -174,3 +174,198 @@ model MediationBuyer {
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 }
 
+model BuyerProfile {
+  id                 String   @id @default(uuid())
+  name               String
+  phone              String   @unique
+  email              String?
+  source             String   @default("Direto")
+  zones              String[] @default([])
+  propertyTypes      String[] @default([])
+  budget             Float    @default(0)
+  bedrooms           Int      @default(0)
+  timeframe          String   @default("Por confirmar")
+  financeStatus      String   @default("Por confirmar")
+  answers            Json     @default("{}")
+  screening          String   @default("Pendente")
+  stage              String   @default("Novo")
+  assignedTo         String   @default("Hugo")
+  notes              String   @default("")
+  callValidatedAt    DateTime?
+  callValidatedBy    String?
+  qualifiedAt        DateTime?
+  nextContactAt      DateTime?
+  propertyId         String?
+  cpcvAt             DateTime?
+  depositConfirmed   Boolean  @default(false)
+  soldAt             DateTime?
+  marketingConsent   Boolean  @default(false)
+  consentAt          DateTime?
+  consentVersion     String?
+  attribution        Json     @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  events             MetaConversion[]
+  referrals          Referral[]
+  acquisitions       BuyerAcquisition[]
+  @@index([stage, screening])
+  @@index([source, createdAt])
+}
+
+model BrokerageProperty {
+  id               String   @id @default(uuid())
+  title            String
+  zone             String
+  propertyType     String
+  bedrooms         Int      @default(0)
+  price            Float
+  business         String   @default("Mediação")
+  stage            String   @default("Angariação")
+  ownerName        String   @default("")
+  ownerPhone       String   @default("")
+  commission       Float    @default(0)
+  description      String   @default("")
+  assignedTo       String   @default("Hugo")
+  legacyLeadId     String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  launches         PropertyLaunch[]
+}
+
+model ReferralPartner {
+  id         String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  email      String?
+  phone      String   @default("")
+  kind       String   @default("Profissional")
+  specialty  String   @default("")
+  reward     Float    @default(2000)
+  active     Boolean  @default(true)
+  notes      String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  referrals  Referral[]
+}
+
+model Referral {
+  id         String   @id @default(uuid())
+  buyerId    String   @unique
+  partnerId  String
+  reward     Float
+  paidAt     DateTime?
+  paidBy     String?
+  createdAt  DateTime @default(now())
+  buyer      BuyerProfile @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  partner    ReferralPartner @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+}
+
+model PropertyLaunch {
+  id             String   @id @default(uuid())
+  propertyId     String
+  scheduledAt    DateTime
+  status         String   @default("Planeado")
+  notes          String   @default("")
+  contactedIds   String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  property       BrokerageProperty @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+}
+
+model MetaConversion {
+  id           String   @id
+  buyerId      String?
+  ownerId      String?
+  acquisitionId String?
+  campaignId   String
+  pixelId      String
+  eventName    String
+  eventTime    DateTime
+  status       String   @default("pending")
+  attempts     Int      @default(0)
+  lastError    String?
+  nextAttempt  DateTime @default(now())
+  lockedUntil  DateTime?
+  sentAt       DateTime?
+  createdAt    DateTime @default(now())
+  buyer        BuyerProfile? @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  owner        OwnerLead? @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  campaign     AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  acquisition  BuyerAcquisition? @relation(fields: [acquisitionId], references: [id], onDelete: Restrict)
+  @@index([status, nextAttempt])
+}
+
+model AdCampaign {
+  id          String @id @default(uuid())
+  name        String
+  slug        String @unique
+  kind        String
+  propertyId  String?
+  headline    String
+  description String @default("")
+  imageUrl    String @default("")
+  pixelId     String @default("")
+  tokenEnv    String @default("")
+  testCode    String @default("")
+  enabled     Boolean @default(false)
+  published   Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  acquisitions BuyerAcquisition[]
+  owners      OwnerLead[]
+  events      MetaConversion[]
+}
+
+model BuyerAcquisition {
+  id          String @id @default(uuid())
+  buyerId     String
+  campaignId  String
+  attribution Json @default("{}")
+  screening   String @default("Pendente")
+  submission  Json @default("{}")
+  consentAt   DateTime?
+  consentVersion String?
+  createdAt   DateTime @default(now())
+  buyer       BuyerProfile @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  campaign    AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  events      MetaConversion[]
+  @@unique([buyerId, campaignId])
+}
+
+model OwnerLead {
+  id          String @id @default(uuid())
+  name        String
+  phone       String
+  email       String @default("")
+  zone        String
+  propertyType String
+  askingPrice Float @default(0)
+  answers     Json @default("{}")
+  screening   String @default("Pendente")
+  stage       String @default("Novo")
+  notes       String @default("")
+  assignedTo  String @default("Hugo")
+  campaignId  String?
+  propertyId  String?
+  callValidatedAt DateTime?
+  qualifiedAt DateTime?
+  marketingConsent Boolean @default(false)
+  consentAt   DateTime?
+  consentVersion String?
+  attribution Json @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  campaign    AdCampaign? @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  events      MetaConversion[]
+  @@index([phone, campaignId])
+}
+
+model MediationAudit {
+  id         String   @id @default(uuid())
+  entityId   String
+  actor      String
+  action     String
+  createdAt  DateTime @default(now())
+  @@index([entityId, createdAt])
+}
+

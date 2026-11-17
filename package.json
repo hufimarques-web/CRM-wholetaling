@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "node scripts/prepare-mediation.mjs && next build",
+    "db:mediation": "MEDIATION_MIGRATE=true node scripts/prepare-mediation.mjs",
+    "test:mediation": "node --import ./scripts/test-loader.mjs --test src/mediation/*.test.mjs",
     "start": "next start -p 3000",
     "postinstall": "prisma generate"
   },

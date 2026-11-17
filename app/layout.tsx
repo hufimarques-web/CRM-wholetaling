@@ -17,8 +17,8 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: 'Wholetailing CRM - Gestão e Arbitragem Imobiliária',
-  description: 'Sistema Operacional Especializado em Wholetailing e Arbitragem Imobiliária em Aveiro',
+  title: 'AH Mediação | CRM Comercial',
+  description: 'Compradores, imóveis e parceiros. Mediação e construção de raiz na região de Aveiro.',
   icons: {
     icon: '/favicon.png',
     apple: '/favicon.png',
