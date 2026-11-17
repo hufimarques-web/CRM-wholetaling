@@ -13,6 +13,16 @@
 
 O objetivo anual é de 65 vendas. A referência 1/200 é a linha de base fornecida pela equipa, não um resultado calculado. O total de vendas conta os compradores marcados como Vendido em 2027; cada apartamento deve ter uma ficha de imóvel separada.
 
+## Organização do espaço de trabalho
+
+- **Hoje:** prioridades de contacto, destaque permanente para angariação contínua e próximos lançamentos.
+- **Compradores:** por qualificar, qualificados e sem enquadramento.
+- **Imóveis:** angariação de proprietários, carteira e lançamentos. Os proprietários sem enquadramento continuam acessíveis no filtro de angariações.
+- **Rede de parceiros:** parceiros, indicações e prémios.
+- **Resultados:** funil por origem e conversão.
+- **Configurações:** páginas/anúncios, banco de perguntas e envios à Meta. As campanhas de angariação contínua e de imóveis individuais têm listas separadas; publicar uma página não ativa anúncios no Meta Ads.
+
+
 ## Banco de perguntas e histórico
 
 O separador **Banco de perguntas** permite criar, duplicar e editar conjuntos para Compradores ou Angariação. Cada pergunta tem texto, posição e regra: eliminatória com Sim/Não aceite, ou informativa. Os critérios de orçamento e financiamento também são configurados nos conjuntos de compradores. É exigida pelo menos uma pergunta eliminatória.
