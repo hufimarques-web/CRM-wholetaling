@@ -1,6 +1,6 @@
 'use client';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Building2, Moon, Sun } from 'lucide-react';
+import { Building2, Home, Moon, Sun } from 'lucide-react';
 
 type Theme = 'normal' | 'gotham';
 const storageKey = 'ah-crm-theme';
@@ -32,4 +32,10 @@ export function ThemeSwitch() {
 export function BrandMark() {
   const { theme } = useCrmTheme();
   return theme === 'gotham' ? <img src="/logo.png" alt="AH"/> : <span className="normal-brand-mark" aria-hidden="true"><Building2 size={24}/></span>;
+}
+
+export function EmptyIllustration({ normal = 'keys' }: { normal?: 'keys' | 'home' }) {
+  const { theme } = useCrmTheme();
+  if (theme === 'normal' && normal === 'home') return <Home size={25} aria-hidden="true"/>;
+  return <img className={`empty-3d${theme === 'gotham' ? ' empty-kryptonite' : ''}`} src={`/images/crm/${theme === 'gotham' ? 'kryptonite' : 'key-copper'}.webp`} width={112} height={112} alt="" loading="lazy" decoding="async"/>;
 }

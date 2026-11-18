@@ -102,4 +102,4 @@ A página pública informa a finalidade do contacto e separa a medição opciona
 
 ## Visuais do CRM
 
-O seletor **Visual do CRM**, no topo e no ecrã de entrada, alterna entre **Normal** (claro, verde discreto e arquitetura) e **Gotham** (grafite, dourado, Bat-Sinal e kryptonite decorativa). Gotham é o valor inicial. A escolha fica guardada neste navegador e sincroniza entre separadores; não altera dados, formulários em curso ou permissões. Sem acesso ao armazenamento local, a alternância continua a funcionar durante a visita.
+O seletor **Visual do CRM**, no topo e no ecrã de entrada, alterna entre **Normal** (claro, verde discreto e arquitetura) e **Gotham** (grafite, dourado, Bat-Sinal e kryptonite nos estados vazios, em vez das chaves ou do ícone de angariação). Gotham é o valor inicial. A escolha fica guardada neste navegador e sincroniza entre separadores; não altera dados, formulários em curso ou permissões. Sem acesso ao armazenamento local, a alternância continua a funcionar durante a visita.
